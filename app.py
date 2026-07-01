@@ -5,9 +5,11 @@ import urllib.parse
 from streamlit_autorefresh import st_autorefresh
 
 # =====================================================================
-# 1. 페이지 기본 설정 및 백그라운드 갱신 (1분)
+# 1. 페이지 기본 설정 및 깜빡임 없는 1분 백그라운드 갱신
 # =====================================================================
 st.set_page_config(page_title="협력사 일일 안전 포털", page_icon="🛡️", layout="wide")
+
+# 60,000 밀리초(1분)마다 화면 깜빡임 없이 파이썬 코드만 재실행하여 최신화
 st_autorefresh(interval=60000, key="ehs_dashboard_refresh")
 
 def local_css():
@@ -79,7 +81,7 @@ def local_css():
 local_css()
 
 # =====================================================================
-# 2. 공공데이터 API 실시간 호출 (데이터 반환 시 현재 시간 함께 반환)
+# 2. 공공데이터/네이버 API 실시간 호출 (데이터만 반환하도록 분리)
 # =====================================================================
 @st.cache_data(ttl=60)
 def get_weather_data():
@@ -100,16 +102,16 @@ def get_weather_data():
                 if item['category'] == 'T1H': weather['temp'] = float(item['obsrValue'])
                 elif item['category'] == 'RN1': weather['rain'] = float(item['obsrValue'])
                 elif item['category'] == 'REH': weather['humid'] = float(item['obsrValue'])
-            return weather, datetime.datetime.now()
+            return weather
     except Exception:
         pass
-    return {'temp': 28.5, 'humid': 60.0, 'rain': 0.0}, datetime.datetime.now()
+    return {'temp': 28.5, 'humid': 60.0, 'rain': 0.0}
 
 @st.cache_data(ttl=60)
 def get_daily_news():
     news_list = []
     
-    # 1. 네이버 뉴스 연동
+    # [1] 네이버 뉴스 연동 (최신 속보 1건)
     try:
         if "NAVER_CLIENT_ID" in st.secrets and "NAVER_CLIENT_SECRET" in st.secrets:
             headers = {
@@ -118,14 +120,14 @@ def get_daily_news():
             }
             query = urllib.parse.quote("중대재해 OR 사고속보")
             response = requests.get(f"https://openapi.naver.com/v1/search/news.json?query={query}&display=1&sort=sim", headers=headers, timeout=5)
-            if response.status_code == 200 and response.json()['items']:
+            if response.status_code == 200 and response.json().get('items'):
                 latest_news = response.json()['items'][0]
                 title = f"⚡ **[최신속보]** {latest_news['title'].replace('<b>', '').replace('</b>', '')}"
                 news_list.append({"title": title, "url": latest_news['link']})
     except Exception:
         pass
 
-    # 2. 안전보건공단 API
+    # [2] 안전보건공단 API (정책/이슈 2건)
     try:
         if "KOSHA_API_KEY" in st.secrets:
             api_key = st.secrets["KOSHA_API_KEY"]
@@ -142,7 +144,7 @@ def get_daily_news():
     except Exception:
         pass
 
-    # 3. 데이터가 없을 경우 Fallback
+    # [3] 만약 KOSHA/네이버 API 모두 실패할 경우를 대비한 무조건 출력 기본값
     if not news_list:
         fallback_data = ["타 현장 지붕 보수공사 중 채광창 파손 추락사고 발생", "혹서기 근로자 휴게시설 설치 기준 및 에어컨 가동 집중 점검 기간"]
         for title in fallback_data:
@@ -150,7 +152,7 @@ def get_daily_news():
             safe_link = f"https://search.naver.com/search.naver?query={search_query}"
             news_list.append({"title": f"🚨 {title}", "url": safe_link})
 
-    return news_list, datetime.datetime.now()
+    return news_list
 
 @st.cache_data(ttl=43200)
 def get_kosha_safety_rules(industry):
@@ -179,11 +181,16 @@ def get_kosha_safety_rules(industry):
 # =====================================================================
 # 3. 대시보드 화면 렌더링
 # =====================================================================
+
+# [핵심 로직] 이 변수는 매 1분마다 코드가 재실행될 때 생성되므로 완벽히 동일한 시간값을 가집니다.
+global_update_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
 st.markdown("<h2 style='text-align: center; color: #1e3a8a;'>🛡️ 협력사 일일 안전보건 정보 포털</h2>", unsafe_allow_html=True)
+st.caption(f"🔄 **대시보드 실시간 동기화:** {global_update_time} 기준 (1분 단위 무중단 자동 갱신 중)")
 st.divider()
 
 # --- [날씨 섹션] ---
-weather_data, weather_update_time = get_weather_data()
+weather_data = get_weather_data()
 st.subheader(f"📡 현장 실시간 기상 정보 (수원 기준)")
 c1, c2, c3 = st.columns(3)
 with c1: st.info(f"🌡️ **현재 기온:** {weather_data['temp']} ℃")
@@ -199,11 +206,11 @@ elif weather_data['rain'] > 0.0:
 else: 
     st.success("✅ 현재 특별한 기상 악화 위험은 없습니다. 기본 수칙을 준수 바랍니다.")
 
-st.caption(f"🕒 날씨 최종 업데이트: {weather_update_time.strftime('%Y-%m-%d %H:%M:%S')}")
+st.caption(f"🕒 날씨 및 환경 지침 최종 업데이트: {global_update_time}")
 st.divider()
 
 # --- [이슈 섹션] ---
-news_data, news_update_time = get_daily_news()
+news_data = get_daily_news()
 st.subheader("📰 오늘의 안전보건 주요 이슈")
 for news in news_data:
     clickable_box = f"""
@@ -213,7 +220,7 @@ for news in news_data:
     """
     st.markdown(clickable_box, unsafe_allow_html=True)
 
-st.caption(f"🕒 뉴스 최종 업데이트: {news_update_time.strftime('%Y-%m-%d %H:%M:%S')}")
+st.caption(f"🕒 주요 이슈 최종 업데이트: {global_update_time}")
 st.divider()
 
 # --- [업종별 탭 섹션] ---
