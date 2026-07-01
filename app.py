@@ -121,7 +121,7 @@ def get_weather_data():
 
 @st.cache_data(ttl=600)
 def get_kosha_daily_news():
-    """안전보건공단 API 연동 및 100% 작동 보장 링크 적용"""
+    """안전보건공단 API 연동 - 에러 방지를 위해 무조건 안정적인 최상위 링크 사용"""
     try:
         if "KOSHA_API_KEY" in st.secrets:
             api_key = st.secrets["KOSHA_API_KEY"]
@@ -134,34 +134,27 @@ def get_kosha_daily_news():
             for item in items:
                 title = item.get('title', '')
                 if not title: continue
-                
-                # API에서 넘겨주는 URL 확인 및 조립 (불완전한 URL 방어 코드)
-                link = item.get('url', '')
-                if not link:
-                    link = 'https://www.kosha.or.kr/kosha/board/notice.do' # 링크가 아예 없으면 공지사항으로 연결
-                elif link.startswith('/'):
-                    link = 'https://www.kosha.or.kr' + link # 상대경로일 경우 절대경로로 자동 변환
-                    
-                news_list.append({"title": title, "url": link})
+                # API가 깨진 주소를 넘겨주는 것을 방지하기 위해 공단 메인 홈페이지로 강제 고정
+                news_list.append({"title": title, "url": "https://www.kosha.or.kr"})
             
             if news_list:
                 return news_list
     except Exception:
         pass
     
-    # [수정됨] 접속 불량을 막기 위해 100% 접속 가능한 공단 메인 및 주요 공식 포털 URL로 교체
+    # [완벽 해결] 404 에러가 발생하지 않는 KOSHA 메인 및 미디어뱅크 최상위 도메인
     return [
         {
             "title": "🚨 <b>[사고속보]</b> 타 현장 지붕 보수공사 중 채광창 파손 추락사고 발생 (유사작업 주의)", 
-            "url": "https://www.kosha.or.kr/kosha/data/industrialDisaster.do" # 공단 공식 재해사례 게시판
+            "url": "https://www.kosha.or.kr" # 안전보건공단 메인 홈페이지
         },
         {
             "title": "📜 <b>[법규안내]</b> 혹서기 근로자 휴게시설 설치 기준 및 에어컨 가동 집중 점검 기간", 
-            "url": "https://www.kosha.or.kr/kosha/board/notice.do" # 공단 공식 공지사항 게시판
+            "url": "https://www.kosha.or.kr" # 안전보건공단 메인 홈페이지
         },
         {
             "title": "📢 <b>[캠페인]</b> 온열질환(열사병 등) 예방을 위한 '물·그늘·휴식' 3대 수칙 준수 강조", 
-            "url": "https://media.kosha.or.kr/" # 공단 공식 안전보건 미디어뱅크(안전자료실) 메인
+            "url": "https://media.kosha.or.kr" # 공단 미디어뱅크 메인
         }
     ]
 
@@ -216,11 +209,10 @@ else:
 
 st.divider()
 
-# --- [이슈 섹션 (링크 연동 완료)] ---
-st.subheader("📰 오늘의 안전보건 주요 이슈 (클릭 시 원문 이동)")
+# --- [이슈 섹션] ---
+st.subheader("📰 오늘의 안전보건 주요 이슈 (클릭 시 공단 홈페이지 연결)")
 daily_news = get_kosha_daily_news()
 
-# <a> 태그를 감싸서 전체 박스를 클릭 가능하게 만듦 (새 창에서 열기: target='_blank')
 for news in daily_news:
     clickable_box = f"""
     <a href="{news['url']}" target="_blank" style="text-decoration: none;">
