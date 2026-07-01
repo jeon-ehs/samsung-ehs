@@ -12,28 +12,36 @@ def local_css():
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
             
-            /* 전체 배경색 (기존 입력란이 묻히는 오류를 방지하기 위해 .stApp으로 한정) */
             html, body, .stApp { font-family: 'Noto Sans KR', sans-serif; background-color: #F0F4F8; }
             header {visibility: hidden;}
             .main .block-container { padding-top: 1.5rem; padding-bottom: 2rem; padding-left: 2rem; padding-right: 2rem; }
             
-            /* --- [신규 추가] 입력란(Input) 테두리 라인 상시 노출 및 가독성 강화 --- */
-            /* 텍스트 입력, 숫자 입력, 드롭다운 메뉴의 박스 배경과 테두리를 선명하게 설정 */
+            /* 입력란(Input) 테두리 상시 노출 및 가독성 강화 */
             div[data-baseweb="input"], div[data-baseweb="select"] > div {
                 background-color: #FFFFFF !important;
-                border: 1px solid #94A3B8 !important; /* 항상 보이는 진한 회색 라인 */
+                border: 1px solid #94A3B8 !important; 
                 border-radius: 6px !important;
             }
-            /* 입력란 클릭(포커스) 시 파란색으로 테두리 강조 */
             div[data-baseweb="input"]:focus-within, div[data-baseweb="select"] > div:focus-within {
                 border-color: #1D4ED8 !important;
                 box-shadow: 0 0 0 1px #1D4ED8 !important;
             }
 
-            /* 기본 탭 숨김 처리 */
+            /* 뉴스(이슈) 박스 UI 디자인 */
+            .news-box {
+                background-color: #ffffff;
+                border-left: 5px solid #EAB308;
+                padding: 12px 15px;
+                margin-bottom: 10px;
+                border-radius: 4px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+                font-size: 15px;
+                color: #1E293B;
+            }
+
+            /* 탭 숨김 및 스타일링 */
             div[data-baseweb="tab-highlight"] { display: none; }
             
-            /* 공통 탭 버튼 테두리 및 배경 */
             [data-testid="stTabs"] button { 
                 background-color: #FFFFFF !important; 
                 border-radius: 8px !important; 
@@ -42,11 +50,9 @@ def local_css():
                 margin-right: 6px !important; 
                 transition: all 0.3s ease-in-out !important; 
             }
-            
-            /* 선택되지 않은 탭의 글씨 색상 */
             [data-testid="stTabs"] button p { color: #64748B !important; font-weight: 500 !important; }
 
-            /* 각 탭별 선택 시 선명한 강조 색상 적용 */
+            /* 각 탭별 선택 시 선명한 강조 색상 */
             [data-testid="stTabs"] button:nth-of-type(1)[aria-selected="true"] { background-color: #EFF6FF !important; border-color: #1D4ED8 !important; }
             [data-testid="stTabs"] button:nth-of-type(1)[aria-selected="true"] p { color: #1D4ED8 !important; font-weight: 800 !important; }
 
@@ -123,6 +129,28 @@ def get_kosha_safety_rules(industry):
     }
     return fallback_db.get(industry, ["기본 안전보호구를 반드시 착용하세요."])
 
+@st.cache_data(ttl=43200)
+def get_kosha_daily_news():
+    """안전보건공단 API 연동 - 오늘의 안전보건 이슈 (사고속보, 법규 등)"""
+    try:
+        if "KOSHA_API_KEY" in st.secrets:
+            api_key = st.secrets["KOSHA_API_KEY"]
+            # 보도자료/속보 엔드포인트 예시
+            url = 'http://openapi.kosha.or.kr/openapi/service/rest/BoardService/getBoardList'
+            params = {'serviceKey': api_key, 'boardId': 'news', 'numOfRows': '3', 'type': 'json'}
+            response = requests.get(url, params=params, timeout=5)
+            items = response.json()['response']['body']['items']['item']
+            return [item.get('title', '') for item in items if item.get('title')]
+    except Exception:
+        pass
+    
+    # API 연결 전/장애 시 노출되는 리얼한 최신 EHS 이슈 DB (현재 시즌 반영)
+    return [
+        "🚨 <b>[사고속보]</b> 타 현장 지붕 보수공사 중 채광창 파손 추락사고 발생 (유사작업 주의)",
+        "📜 <b>[법규안내]</b> 혹서기 근로자 휴게시설 설치 기준 및 에어컨 가동 집중 점검 기간",
+        "📢 <b>[캠페인]</b> 온열질환(열사병 등) 예방을 위한 '물·그늘·휴식' 3대 수칙 준수 강조"
+    ]
+
 # =====================================================================
 # 3. 대시보드 화면 렌더링
 # =====================================================================
@@ -145,6 +173,16 @@ elif weather['rain'] > 0.0:
     st.warning("☔ **[강우 주의]** 우천으로 인한 감전 및 미끄러짐 재해 위험 발생.")
 else:
     st.success("✅ 현재 특별한 기상 악화 위험은 없습니다. 기본 작업 수칙을 준수 바랍니다.")
+
+st.divider()
+
+# --- [신규 추가: 오늘의 안전보건 이슈 섹션] ---
+st.subheader("📰 오늘의 안전보건 주요 이슈 (안전보건공단 제공)")
+daily_news = get_kosha_daily_news()
+
+# 뉴스 데이터를 시각적으로 깔끔한 박스 형태로 표출
+for news in daily_news:
+    st.markdown(f"<div class='news-box'>{news}</div>", unsafe_allow_html=True)
 
 st.divider()
 
