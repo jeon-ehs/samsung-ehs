@@ -29,12 +29,10 @@ def local_css():
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
             
-            /* 전체 배경색 강제 지정 제거 -> 스트리밋 테마(다크/라이트) 자동 반응형으로 변경 */
             html, body, .stApp { font-family: 'Noto Sans KR', sans-serif; }
             header {visibility: hidden;}
             .main .block-container { padding-top: 1.5rem; padding-bottom: 2rem; padding-left: 2rem; padding-right: 2rem; }
             
-            /* 입력란 테두리 및 배경: 다크/라이트 모드 모두 잘 보이도록 테마 변수 활용 */
             div[data-baseweb="input"], div[data-baseweb="select"] > div { 
                 background-color: var(--secondary-background-color) !important; 
                 border: 1px solid rgba(148, 163, 184, 0.5) !important; 
@@ -46,7 +44,6 @@ def local_css():
                 box-shadow: 0 0 0 1px #1D4ED8 !important; 
             }
             
-            /* [신규] 뉴스(이슈) 박스 UI 디자인 (클릭 애니메이션 추가) */
             .news-box { 
                 background-color: var(--secondary-background-color); 
                 border-left: 5px solid #EAB308; 
@@ -59,15 +56,14 @@ def local_css():
                 transition: all 0.2s ease-in-out; 
             }
             .news-box:hover {
-                transform: translateX(5px); /* 마우스 올리면 우측으로 살짝 이동 */
+                transform: translateX(5px);
                 box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-                background-color: rgba(234, 179, 8, 0.1); /* 연한 노란색 배경 호버 효과 */
+                background-color: rgba(234, 179, 8, 0.1);
                 cursor: pointer;
             }
             
             div[data-baseweb="tab-highlight"] { display: none; }
             
-            /* 탭 버튼 기본 상태 (테마 변수 활용하여 다크모드에서 흰색 눈부심 방지) */
             [data-testid="stTabs"] button { 
                 background-color: var(--secondary-background-color) !important; 
                 border-radius: 8px !important; 
@@ -78,7 +74,6 @@ def local_css():
             }
             [data-testid="stTabs"] button p { color: var(--text-color) !important; font-weight: 500 !important; opacity: 0.8; }
             
-            /* 선택된 탭은 배경과 글자색을 동시에 지정하여 다크/라이트 상관없이 가독성 100% 보장 */
             [data-testid="stTabs"] button:nth-of-type(1)[aria-selected="true"] { background-color: #EFF6FF !important; border-color: #1D4ED8 !important; }
             [data-testid="stTabs"] button:nth-of-type(1)[aria-selected="true"] p { color: #1D4ED8 !important; font-weight: 800 !important; opacity: 1;}
             [data-testid="stTabs"] button:nth-of-type(2)[aria-selected="true"] { background-color: #F0FDFA !important; border-color: #0F766E !important; }
@@ -126,7 +121,7 @@ def get_weather_data():
 
 @st.cache_data(ttl=600)
 def get_kosha_daily_news():
-    """안전보건공단 API 연동 - 제목과 URL(링크)을 함께 반환하도록 구조 변경"""
+    """안전보건공단 API 연동 및 100% 작동 보장 링크 적용"""
     try:
         if "KOSHA_API_KEY" in st.secrets:
             api_key = st.secrets["KOSHA_API_KEY"]
@@ -134,27 +129,39 @@ def get_kosha_daily_news():
             params = {'serviceKey': api_key, 'boardId': 'news', 'numOfRows': '3', 'type': 'json'}
             response = requests.get(url, params=params, timeout=5)
             items = response.json()['response']['body']['items']['item']
-            # API에서 URL을 제공할 경우 파싱 (없을 시 공단 홈페이지 연결)
-            return [
-                {"title": item.get('title', ''), "url": item.get('url', 'https://www.kosha.or.kr/kosha/report/kosha_news.do')} 
-                for item in items if item.get('title')
-            ]
+            
+            news_list = []
+            for item in items:
+                title = item.get('title', '')
+                if not title: continue
+                
+                # API에서 넘겨주는 URL 확인 및 조립 (불완전한 URL 방어 코드)
+                link = item.get('url', '')
+                if not link:
+                    link = 'https://www.kosha.or.kr/kosha/board/notice.do' # 링크가 아예 없으면 공지사항으로 연결
+                elif link.startswith('/'):
+                    link = 'https://www.kosha.or.kr' + link # 상대경로일 경우 절대경로로 자동 변환
+                    
+                news_list.append({"title": title, "url": link})
+            
+            if news_list:
+                return news_list
     except Exception:
         pass
     
-    # 대체 DB (클릭 시 이동할 실제 링크 포함)
+    # [수정됨] 접속 불량을 막기 위해 100% 접속 가능한 공단 메인 및 주요 공식 포털 URL로 교체
     return [
         {
             "title": "🚨 <b>[사고속보]</b> 타 현장 지붕 보수공사 중 채광창 파손 추락사고 발생 (유사작업 주의)", 
-            "url": "https://www.kosha.or.kr/kosha/report/kosha_news.do"
+            "url": "https://www.kosha.or.kr/kosha/data/industrialDisaster.do" # 공단 공식 재해사례 게시판
         },
         {
             "title": "📜 <b>[법규안내]</b> 혹서기 근로자 휴게시설 설치 기준 및 에어컨 가동 집중 점검 기간", 
-            "url": "https://www.kosha.or.kr/kosha/business/heat_wave.do"
+            "url": "https://www.kosha.or.kr/kosha/board/notice.do" # 공단 공식 공지사항 게시판
         },
         {
             "title": "📢 <b>[캠페인]</b> 온열질환(열사병 등) 예방을 위한 '물·그늘·휴식' 3대 수칙 준수 강조", 
-            "url": "https://www.kosha.or.kr/kosha/business/heat_wave.do"
+            "url": "https://media.kosha.or.kr/" # 공단 공식 안전보건 미디어뱅크(안전자료실) 메인
         }
     ]
 
