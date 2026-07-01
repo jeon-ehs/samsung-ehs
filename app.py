@@ -28,39 +28,28 @@ def local_css():
                 transition: all 0.3s ease-in-out !important; 
             }
             
-            /* 선택되지 않은 탭의 글씨 색상 (기본 회색) */
-            [data-testid="stTabs"] button p {
-                color: #64748B !important;
-                font-weight: 500 !important;
-            }
+            /* 선택되지 않은 탭의 글씨 색상 */
+            [data-testid="stTabs"] button p { color: #64748B !important; font-weight: 500 !important; }
 
-            /* --- 각 탭별 선택(Click) 시 텍스트 및 테두리 색상 선명하게 강조 --- */
-            
-            /* 1. 시설관리 (진한 파랑 글씨) */
+            /* 각 탭별 선택 시 선명한 강조 색상 적용 */
             [data-testid="stTabs"] button:nth-of-type(1)[aria-selected="true"] { background-color: #EFF6FF !important; border-color: #1D4ED8 !important; }
             [data-testid="stTabs"] button:nth-of-type(1)[aria-selected="true"] p { color: #1D4ED8 !important; font-weight: 800 !important; }
 
-            /* 2. 청소 (진한 청록 글씨) */
             [data-testid="stTabs"] button:nth-of-type(2)[aria-selected="true"] { background-color: #F0FDFA !important; border-color: #0F766E !important; }
             [data-testid="stTabs"] button:nth-of-type(2)[aria-selected="true"] p { color: #0F766E !important; font-weight: 800 !important; }
 
-            /* 3. 물류 (진한 주황 글씨) */
             [data-testid="stTabs"] button:nth-of-type(3)[aria-selected="true"] { background-color: #FFF7ED !important; border-color: #C2410C !important; }
             [data-testid="stTabs"] button:nth-of-type(3)[aria-selected="true"] p { color: #C2410C !important; font-weight: 800 !important; }
 
-            /* 4. 식당 (진한 빨강 글씨) */
             [data-testid="stTabs"] button:nth-of-type(4)[aria-selected="true"] { background-color: #FEF2F2 !important; border-color: #B91C1C !important; }
             [data-testid="stTabs"] button:nth-of-type(4)[aria-selected="true"] p { color: #B91C1C !important; font-weight: 800 !important; }
 
-            /* 5. 서비스 (진한 보라 글씨) */
             [data-testid="stTabs"] button:nth-of-type(5)[aria-selected="true"] { background-color: #FAF5FF !important; border-color: #6D28D9 !important; }
             [data-testid="stTabs"] button:nth-of-type(5)[aria-selected="true"] p { color: #6D28D9 !important; font-weight: 800 !important; }
 
-            /* 6. 폐기물처리 (진한 갈색 글씨) */
             [data-testid="stTabs"] button:nth-of-type(6)[aria-selected="true"] { background-color: #FEF3C7 !important; border-color: #B45309 !important; }
             [data-testid="stTabs"] button:nth-of-type(6)[aria-selected="true"] p { color: #B45309 !important; font-weight: 800 !important; }
 
-            /* 7. 제조 (진회색 글씨) */
             [data-testid="stTabs"] button:nth-of-type(7)[aria-selected="true"] { background-color: #F8FAFC !important; border-color: #334155 !important; }
             [data-testid="stTabs"] button:nth-of-type(7)[aria-selected="true"] p { color: #334155 !important; font-weight: 800 !important; }
         </style>
@@ -167,6 +156,9 @@ form_col1, form_col2, form_col3 = st.columns(3)
 with form_col1: contractor_name = st.text_input("🏢 협력사명 입력 (예: 삼성건설)")
 with form_col2: worker_cnt = st.number_input("👥 투입 인원 (명)", min_value=1, value=3)
 with form_col3: selected_industry = st.selectbox("🛠️ 작업 업종 선택", industry_list)
+
+# 입력란과 생성 버튼 사이에 시각적 구분선 추가
+st.markdown("<hr style='margin: 15px 0 25px 0; border: 1px solid #E2E8F0;'>", unsafe_allow_html=True)
 
 if st.button("🖨️ 현장 공유용 TBM 확인서 생성"):
     if contractor_name:
