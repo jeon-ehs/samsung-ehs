@@ -4,7 +4,7 @@ import datetime
 import streamlit.components.v1 as components
 
 # =====================================================================
-# [자동 새로고침] 10분 단위 데이터 갱신
+# [자동 새로고침] 1분(60초) 단위 데이터 및 화면 갱신
 # =====================================================================
 def auto_refresh(interval_seconds):
     components.html(
@@ -17,7 +17,7 @@ def auto_refresh(interval_seconds):
         """,
         height=0, width=0,
     )
-auto_refresh(600) # 10분
+auto_refresh(60) # 60초 = 1분으로 단축
 
 # =====================================================================
 # 1. 페이지 기본 설정 및 [다크/라이트 모드 자동 호환] CSS 주입
@@ -93,9 +93,9 @@ def local_css():
 local_css()
 
 # =====================================================================
-# 2. 공공데이터 API 실시간 호출
+# 2. 공공데이터 API 실시간 호출 (데이터 캐싱 주기도 1분(60초)으로 변경)
 # =====================================================================
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=60)
 def get_weather_data():
     try:
         if "KMA_API_KEY" in st.secrets:
@@ -119,9 +119,9 @@ def get_weather_data():
         pass
     return {'temp': 28.5, 'humid': 60.0, 'rain': 0.0}
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=60)
 def get_kosha_daily_news():
-    """안전보건공단 API 연동 - 에러 방지를 위해 무조건 안정적인 최상위 링크 사용"""
+    """안전보건공단 API 연동 - 원본 게시글 다이렉트 링크 파싱 및 조립"""
     try:
         if "KOSHA_API_KEY" in st.secrets:
             api_key = st.secrets["KOSHA_API_KEY"]
@@ -134,27 +134,40 @@ def get_kosha_daily_news():
             for item in items:
                 title = item.get('title', '')
                 if not title: continue
-                # API가 깨진 주소를 넘겨주는 것을 방지하기 위해 공단 메인 홈페이지로 강제 고정
-                news_list.append({"title": title, "url": "https://www.kosha.or.kr"})
+                
+                # 원문 다이렉트 링크 복원 로직
+                raw_url = item.get('url', '')
+                if raw_url:
+                    if raw_url.startswith('http'): 
+                        link = raw_url
+                    else: 
+                        # 상대 경로일 경우 절대 경로로 강제 조립
+                        if not raw_url.startswith('/'): raw_url = '/' + raw_url
+                        link = f"https://www.kosha.or.kr{raw_url}"
+                else:
+                    # URL이 전혀 없을 경우 해당 공지사항 통합 게시판으로 대체
+                    link = "https://www.kosha.or.kr/kosha/report/kosha_news.do"
+                    
+                news_list.append({"title": title, "url": link})
             
             if news_list:
                 return news_list
     except Exception:
         pass
     
-    # [완벽 해결] 404 에러가 발생하지 않는 KOSHA 메인 및 미디어뱅크 최상위 도메인
+    # API 미연결 시 보여주는 대체 DB (이 역시 원문 확인이 가능한 각 게시판으로 직결)
     return [
         {
             "title": "🚨 <b>[사고속보]</b> 타 현장 지붕 보수공사 중 채광창 파손 추락사고 발생 (유사작업 주의)", 
-            "url": "https://www.kosha.or.kr" # 안전보건공단 메인 홈페이지
+            "url": "https://www.kosha.or.kr/kosha/data/industrialDisaster.do" # 재해사례 게시판
         },
         {
             "title": "📜 <b>[법규안내]</b> 혹서기 근로자 휴게시설 설치 기준 및 에어컨 가동 집중 점검 기간", 
-            "url": "https://www.kosha.or.kr" # 안전보건공단 메인 홈페이지
+            "url": "https://www.kosha.or.kr/kosha/info/law_01.do" # 법령정보 게시판
         },
         {
             "title": "📢 <b>[캠페인]</b> 온열질환(열사병 등) 예방을 위한 '물·그늘·휴식' 3대 수칙 준수 강조", 
-            "url": "https://media.kosha.or.kr" # 공단 미디어뱅크 메인
+            "url": "https://media.kosha.or.kr/" # 미디어뱅크 메인
         }
     ]
 
@@ -188,7 +201,7 @@ def get_kosha_safety_rules(industry):
 st.markdown("<h2 style='text-align: center; color: #1e3a8a;'>🛡️ 협력사 일일 안전보건 정보 포털</h2>", unsafe_allow_html=True)
 
 current_time_str = datetime.datetime.now().strftime('%Y년 %m월 %d일 %H:%M')
-st.caption(f"📅 **오늘의 날짜:** {current_time_str} 기준 (10분 단위 자동 업데이트 적용 완료)")
+st.caption(f"📅 **오늘의 날짜:** {current_time_str} 기준 (1분 단위 실시간 자동 업데이트 중 🔄)")
 
 # --- [날씨 섹션] ---
 st.subheader("📡 현장 실시간 기상 및 환경 지침 (수원 기준)")
@@ -209,8 +222,8 @@ else:
 
 st.divider()
 
-# --- [이슈 섹션] ---
-st.subheader("📰 오늘의 안전보건 주요 이슈 (클릭 시 공단 홈페이지 연결)")
+# --- [이슈 섹션 (원문 다이렉트 링크 연동 완료)] ---
+st.subheader("📰 오늘의 안전보건 주요 이슈 (클릭 시 기사 원문 이동)")
 daily_news = get_kosha_daily_news()
 
 for news in daily_news:
