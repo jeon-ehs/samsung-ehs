@@ -3,7 +3,7 @@ import requests
 import datetime
 
 # =====================================================================
-# 1. 페이지 기본 설정 및 [반응형 컬러 탭] CSS 주입
+# 1. 페이지 기본 설정 및 [선명한 텍스트 강조형] CSS 주입
 # =====================================================================
 st.set_page_config(page_title="협력사 일일 안전 포털", page_icon="🛡️", layout="wide")
 
@@ -15,48 +15,54 @@ def local_css():
             header {visibility: hidden;}
             .main .block-container { padding-top: 1.5rem; padding-bottom: 2rem; padding-left: 2rem; padding-right: 2rem; }
             
-            /* 기본 탭 숨김 처리 (기본 밑줄 제거) */
+            /* 기본 탭 숨김 처리 */
             div[data-baseweb="tab-highlight"] { display: none; }
             
-            /* 공통 탭 버튼 기본 스타일 (부드러운 애니메이션 적용) */
+            /* 공통 탭 버튼 테두리 및 배경 */
             [data-testid="stTabs"] button { 
-                background-color: #FFFFFF; 
-                border-radius: 8px; 
-                color: #64748B; 
-                font-weight: 600; 
-                padding: 12px 18px; 
-                border: 2px solid #E2E8F0; 
-                margin-right: 8px; 
-                transition: all 0.3s ease-in-out; /* 마우스 반응 애니메이션 */
+                background-color: #FFFFFF !important; 
+                border-radius: 8px !important; 
+                padding: 10px 16px !important; 
+                border: 2px solid #E2E8F0 !important; 
+                margin-right: 6px !important; 
+                transition: all 0.3s ease-in-out !important; 
             }
             
-            /* 1. 시설관리 (파랑 테마) */
-            [data-testid="stTabs"] button:nth-of-type(1):hover { background-color: #EFF6FF; color: #1D4ED8; border-color: #93C5FD; transform: translateY(-2px); }
-            [data-testid="stTabs"] button:nth-of-type(1)[aria-selected="true"] { background-color: #1D4ED8; color: white; border-color: #1D4ED8; box-shadow: 0 4px 10px rgba(29,78,216,0.3); }
+            /* 선택되지 않은 탭의 글씨 색상 (기본 회색) */
+            [data-testid="stTabs"] button p {
+                color: #64748B !important;
+                font-weight: 500 !important;
+            }
 
-            /* 2. 청소 (청록 테마) */
-            [data-testid="stTabs"] button:nth-of-type(2):hover { background-color: #F0FDFA; color: #0F766E; border-color: #5EEAD4; transform: translateY(-2px); }
-            [data-testid="stTabs"] button:nth-of-type(2)[aria-selected="true"] { background-color: #0F766E; color: white; border-color: #0F766E; box-shadow: 0 4px 10px rgba(15,118,110,0.3); }
+            /* --- 각 탭별 선택(Click) 시 텍스트 및 테두리 색상 선명하게 강조 --- */
+            
+            /* 1. 시설관리 (진한 파랑 글씨) */
+            [data-testid="stTabs"] button:nth-of-type(1)[aria-selected="true"] { background-color: #EFF6FF !important; border-color: #1D4ED8 !important; }
+            [data-testid="stTabs"] button:nth-of-type(1)[aria-selected="true"] p { color: #1D4ED8 !important; font-weight: 800 !important; }
 
-            /* 3. 물류 (주황 테마) */
-            [data-testid="stTabs"] button:nth-of-type(3):hover { background-color: #FFF7ED; color: #C2410C; border-color: #FDBA74; transform: translateY(-2px); }
-            [data-testid="stTabs"] button:nth-of-type(3)[aria-selected="true"] { background-color: #C2410C; color: white; border-color: #C2410C; box-shadow: 0 4px 10px rgba(194,65,12,0.3); }
+            /* 2. 청소 (진한 청록 글씨) */
+            [data-testid="stTabs"] button:nth-of-type(2)[aria-selected="true"] { background-color: #F0FDFA !important; border-color: #0F766E !important; }
+            [data-testid="stTabs"] button:nth-of-type(2)[aria-selected="true"] p { color: #0F766E !important; font-weight: 800 !important; }
 
-            /* 4. 식당 (빨강 테마) */
-            [data-testid="stTabs"] button:nth-of-type(4):hover { background-color: #FEF2F2; color: #B91C1C; border-color: #FCA5A5; transform: translateY(-2px); }
-            [data-testid="stTabs"] button:nth-of-type(4)[aria-selected="true"] { background-color: #B91C1C; color: white; border-color: #B91C1C; box-shadow: 0 4px 10px rgba(185,28,28,0.3); }
+            /* 3. 물류 (진한 주황 글씨) */
+            [data-testid="stTabs"] button:nth-of-type(3)[aria-selected="true"] { background-color: #FFF7ED !important; border-color: #C2410C !important; }
+            [data-testid="stTabs"] button:nth-of-type(3)[aria-selected="true"] p { color: #C2410C !important; font-weight: 800 !important; }
 
-            /* 5. 서비스 (보라 테마) */
-            [data-testid="stTabs"] button:nth-of-type(5):hover { background-color: #FAF5FF; color: #6D28D9; border-color: #D8B4FE; transform: translateY(-2px); }
-            [data-testid="stTabs"] button:nth-of-type(5)[aria-selected="true"] { background-color: #6D28D9; color: white; border-color: #6D28D9; box-shadow: 0 4px 10px rgba(109,40,217,0.3); }
+            /* 4. 식당 (진한 빨강 글씨) */
+            [data-testid="stTabs"] button:nth-of-type(4)[aria-selected="true"] { background-color: #FEF2F2 !important; border-color: #B91C1C !important; }
+            [data-testid="stTabs"] button:nth-of-type(4)[aria-selected="true"] p { color: #B91C1C !important; font-weight: 800 !important; }
 
-            /* 6. 폐기물처리 (갈색 테마) */
-            [data-testid="stTabs"] button:nth-of-type(6):hover { background-color: #FEF3C7; color: #B45309; border-color: #FCD34D; transform: translateY(-2px); }
-            [data-testid="stTabs"] button:nth-of-type(6)[aria-selected="true"] { background-color: #B45309; color: white; border-color: #B45309; box-shadow: 0 4px 10px rgba(180,83,9,0.3); }
+            /* 5. 서비스 (진한 보라 글씨) */
+            [data-testid="stTabs"] button:nth-of-type(5)[aria-selected="true"] { background-color: #FAF5FF !important; border-color: #6D28D9 !important; }
+            [data-testid="stTabs"] button:nth-of-type(5)[aria-selected="true"] p { color: #6D28D9 !important; font-weight: 800 !important; }
 
-            /* 7. 제조 (진회색 테마) */
-            [data-testid="stTabs"] button:nth-of-type(7):hover { background-color: #F8FAFC; color: #334155; border-color: #CBD5E1; transform: translateY(-2px); }
-            [data-testid="stTabs"] button:nth-of-type(7)[aria-selected="true"] { background-color: #334155; color: white; border-color: #334155; box-shadow: 0 4px 10px rgba(51,65,85,0.3); }
+            /* 6. 폐기물처리 (진한 갈색 글씨) */
+            [data-testid="stTabs"] button:nth-of-type(6)[aria-selected="true"] { background-color: #FEF3C7 !important; border-color: #B45309 !important; }
+            [data-testid="stTabs"] button:nth-of-type(6)[aria-selected="true"] p { color: #B45309 !important; font-weight: 800 !important; }
+
+            /* 7. 제조 (진회색 글씨) */
+            [data-testid="stTabs"] button:nth-of-type(7)[aria-selected="true"] { background-color: #F8FAFC !important; border-color: #334155 !important; }
+            [data-testid="stTabs"] button:nth-of-type(7)[aria-selected="true"] p { color: #334155 !important; font-weight: 800 !important; }
         </style>
     """, unsafe_allow_html=True)
 local_css()
