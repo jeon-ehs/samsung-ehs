@@ -11,10 +11,25 @@ def local_css():
     st.markdown("""
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
-            html, body, [class*="st-"] { font-family: 'Noto Sans KR', sans-serif; background-color: #F0F4F8; }
+            
+            /* 전체 배경색 (기존 입력란이 묻히는 오류를 방지하기 위해 .stApp으로 한정) */
+            html, body, .stApp { font-family: 'Noto Sans KR', sans-serif; background-color: #F0F4F8; }
             header {visibility: hidden;}
             .main .block-container { padding-top: 1.5rem; padding-bottom: 2rem; padding-left: 2rem; padding-right: 2rem; }
             
+            /* --- [신규 추가] 입력란(Input) 테두리 라인 상시 노출 및 가독성 강화 --- */
+            /* 텍스트 입력, 숫자 입력, 드롭다운 메뉴의 박스 배경과 테두리를 선명하게 설정 */
+            div[data-baseweb="input"], div[data-baseweb="select"] > div {
+                background-color: #FFFFFF !important;
+                border: 1px solid #94A3B8 !important; /* 항상 보이는 진한 회색 라인 */
+                border-radius: 6px !important;
+            }
+            /* 입력란 클릭(포커스) 시 파란색으로 테두리 강조 */
+            div[data-baseweb="input"]:focus-within, div[data-baseweb="select"] > div:focus-within {
+                border-color: #1D4ED8 !important;
+                box-shadow: 0 0 0 1px #1D4ED8 !important;
+            }
+
             /* 기본 탭 숨김 처리 */
             div[data-baseweb="tab-highlight"] { display: none; }
             
@@ -157,7 +172,6 @@ with form_col1: contractor_name = st.text_input("🏢 협력사명 입력 (예: 
 with form_col2: worker_cnt = st.number_input("👥 투입 인원 (명)", min_value=1, value=3)
 with form_col3: selected_industry = st.selectbox("🛠️ 작업 업종 선택", industry_list)
 
-# 입력란과 생성 버튼 사이에 시각적 구분선 추가
 st.markdown("<hr style='margin: 15px 0 25px 0; border: 1px solid #E2E8F0;'>", unsafe_allow_html=True)
 
 if st.button("🖨️ 현장 공유용 TBM 확인서 생성"):
