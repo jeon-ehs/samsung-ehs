@@ -13,7 +13,6 @@ st_autorefresh(interval=60000, key="ehs_dashboard_refresh")
 def local_css():
     st.markdown("""
         <style>
-            /* CSS 코드는 변경사항 없습니다 */
             @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
             html, body, .stApp { font-family: 'Noto Sans KR', sans-serif; }
             header {visibility: hidden;}
@@ -45,7 +44,7 @@ def get_weather_data():
         if "KMA_API_KEY" in st.secrets:
             api_key = st.secrets["KMA_API_KEY"]
             url = 'http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtNcst'
-            now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9))) # 한국 시간 기준
+            now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9)))
             if now.minute < 40: now = now - datetime.timedelta(hours=1)
             params = {'serviceKey': api_key, 'pageNo': '1', 'numOfRows': '10', 'dataType': 'JSON', 'base_date': now.strftime('%Y%m%d'), 'base_time': now.strftime('%H00'), 'nx': '60', 'ny': '121'}
             response = requests.get(url, params=params, timeout=5)
@@ -63,7 +62,7 @@ def get_weather_data():
 @st.cache_data(ttl=60)
 def get_daily_news():
     news_list = []
-    try: # 네이버 뉴스
+    try: 
         if "NAVER_CLIENT_ID" in st.secrets and "NAVER_CLIENT_SECRET" in st.secrets:
             headers = {'X-Naver-Client-Id': st.secrets['NAVER_CLIENT_ID'], 'X-Naver-Client-Secret': st.secrets['NAVER_CLIENT_SECRET']}
             query = urllib.parse.quote("중대재해 OR 사고속보")
@@ -73,7 +72,7 @@ def get_daily_news():
                 title = f"⚡ **[최신속보]** {latest_news['title'].replace('<b>', '').replace('</b>', '')}"
                 news_list.append({"title": title, "url": latest_news['link']})
     except Exception: pass
-    try: # 안전보건공단
+    try: 
         if "KOSHA_API_KEY" in st.secrets:
             api_key = st.secrets["KOSHA_API_KEY"]
             url = 'http://openapi.kosha.or.kr/openapi/service/rest/BoardService/getBoardList'
@@ -87,7 +86,7 @@ def get_daily_news():
                 safe_link = f"https://search.naver.com/search.naver?query={search_query}"
                 news_list.append({"title": title, "url": safe_link})
     except Exception: pass
-    if not news_list: # 모든 API 실패 시
+    if not news_list: 
         fallback_data = ["타 현장 지붕 보수공사 중 채광창 파손 추락사고 발생", "혹서기 근로자 휴게시설 설치 기준 및 에어컨 가동 집중 점검 기간"]
         for title in fallback_data:
             search_query = urllib.parse.quote(f"안전보건공단 {title}")
@@ -112,8 +111,6 @@ def get_kosha_safety_rules(industry):
 # =====================================================================
 # 3. 대시보드 화면 렌더링
 # =====================================================================
-
-# [핵심 개선] 한국 시간(KST)을 기준으로 정확한 현재 시간 생성
 kst_timezone = datetime.timezone(datetime.timedelta(hours=9))
 current_kst_time = datetime.datetime.now(kst_timezone).strftime('%Y-%m-%d %H:%M:%S')
 
@@ -169,12 +166,21 @@ if submitted:
         weather_alert = "기상 악화 사항 없음"
         if weather_data['temp'] >= 33.0: weather_alert = "폭염 경보 (물/그늘/휴식 필수)"
         elif weather_data['rain'] > 0: weather_alert = "우천 주의 (옥외 전기작업 금지)"
+        
+        # 1. 안전수칙 텍스트 정리
         rules_data = get_kosha_safety_rules(selected_industry)
         rules_text = "\n".join([f"  - {rule}" for rule in rules_data])
+        
+        # 2. [추가됨] 주요 이슈 텍스트 정리 (마크다운 ** 기호를 제거하여 카톡 등에서 깔끔하게 보이도록 처리)
+        issue_text = "\n".join([f"  - {news['title'].replace('**', '')}" for news in news_data])
+        
+        # 3. TBM 텍스트 조립
         header_text = f"[ 일일 TBM 무재해 이행 확인서 ]\n■ 협력사명: {contractor_name}\n■ 투입인원: {worker_cnt}명\n■ 기상특보: {weather_alert}\n■ 작업업종: {selected_industry}"
-        middle_text = f"\n[ 금일 {selected_industry} 핵심 안전수칙 ]\n{rules_text}\n"
+        news_section = f"\n[ 오늘의 주요 안전보건 이슈 ]\n{issue_text}"
+        middle_text = f"\n\n[ 금일 {selected_industry} 핵심 안전수칙 ]\n{rules_text}\n"
         bottom_text = "-----------------------------------------\n[ 필수 안전점검 확인 ]\n1. 작업 전 위험성평가 내용을 전원 숙지하였는가? ( O )\n2. 안전모, 안전화 등 개인보호구를 완벽히 착용하였는가? ( O )\n3. 음주자, 질병자 등 건강이상자가 없는가? ( O )\n========================================="
-        final_tbm_result = f"=========================================\n{header_text}\n{middle_text}\n{bottom_text}"
-        st.text_area("✨ 아래 텍스트를 복사하여 카카오톡/메시지로 공유하세요.", value=final_tbm_result, height=350)
+        
+        final_tbm_result = f"=========================================\n{header_text}\n{news_section}{middle_text}{bottom_text}"
+        st.text_area("✨ 아래 텍스트를 복사하여 카카오톡/메시지로 공유하세요.", value=final_tbm_result, height=450)
     else:
         st.error("협력사명을 반드시 입력해 주세요.")
