@@ -1,29 +1,16 @@
 import streamlit as st
 import requests
 import datetime
-import streamlit.components.v1 as components
-import urllib.parse # URL 인코딩을 위한 기본 라이브러리 추가
-
-# =====================================================================
-# [자동 새로고침] 1분(60초) 단위 데이터 및 화면 갱신
-# =====================================================================
-def auto_refresh(interval_seconds):
-    components.html(
-        f"""
-        <script>
-            setTimeout(function() {{
-                window.parent.location.reload();
-            }}, {interval_seconds * 1000});
-        </script>
-        """,
-        height=0, width=0,
-    )
-auto_refresh(60)
+import urllib.parse
+from streamlit_autorefresh import st_autorefresh # 깜빡임 방지 라이브러리 호출
 
 # =====================================================================
 # 1. 페이지 기본 설정 및 [다크/라이트 모드 자동 호환] CSS 주입
 # =====================================================================
 st.set_page_config(page_title="협력사 일일 안전 포털", page_icon="🛡️", layout="wide")
+
+# [핵심] 화면 깜빡임 없이 1분(60000ms)마다 백그라운드에서 데이터만 조용히 갱신합니다.
+st_autorefresh(interval=60000, key="ehs_dashboard_refresh")
 
 def local_css():
     st.markdown("""
@@ -122,7 +109,6 @@ def get_weather_data():
 
 @st.cache_data(ttl=60)
 def get_kosha_daily_news():
-    """근본적 해결: 공단 API의 불량 URL을 버리고, 해당 제목으로 네이버 뉴스 검색 자동 연동"""
     news_list = []
     try:
         if "KOSHA_API_KEY" in st.secrets:
@@ -135,31 +121,23 @@ def get_kosha_daily_news():
             for item in items:
                 title = item.get('title', '')
                 if not title: continue
-                
-                # 핵심: 해당 제목으로 네이버 통합검색 링크 생성 (404 에러 절대 발생 안 함)
-                # '안전보건공단' 키워드를 덧붙여 정확도를 높임
                 search_query = urllib.parse.quote(f"안전보건공단 {title}")
                 safe_link = f"https://search.naver.com/search.naver?query={search_query}"
-                
                 news_list.append({"title": title, "url": safe_link})
-            
             if news_list:
                 return news_list
     except Exception:
         pass
     
-    # API 오류 시 나타나는 기본값(Fallback)도 네이버 스마트 검색으로 통일
     fallback_data = [
         "타 현장 지붕 보수공사 중 채광창 파손 추락사고 발생",
         "혹서기 근로자 휴게시설 설치 기준 및 에어컨 가동 집중 점검 기간",
         "온열질환(열사병 등) 예방을 위한 '물·그늘·휴식' 3대 수칙 준수 강조"
     ]
-    
     for title in fallback_data:
         search_query = urllib.parse.quote(f"안전보건공단 {title}")
         safe_link = f"https://search.naver.com/search.naver?query={search_query}"
         news_list.append({"title": f"🚨 {title}", "url": safe_link})
-        
     return news_list
 
 @st.cache_data(ttl=43200)
@@ -192,7 +170,7 @@ def get_kosha_safety_rules(industry):
 st.markdown("<h2 style='text-align: center; color: #1e3a8a;'>🛡️ 협력사 일일 안전보건 정보 포털</h2>", unsafe_allow_html=True)
 
 current_time_str = datetime.datetime.now().strftime('%Y년 %m월 %d일 %H:%M')
-st.caption(f"📅 **오늘의 날짜:** {current_time_str} 기준 (1분 단위 실시간 자동 업데이트 중 🔄)")
+st.caption(f"📅 **오늘의 날짜:** {current_time_str} 기준 (1분 단위 깜빡임 없는 무중단 업데이트 🔄)")
 
 # --- [날씨 섹션] ---
 st.subheader("📡 현장 실시간 기상 및 환경 지침 (수원 기준)")
