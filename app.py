@@ -1,6 +1,24 @@
 import streamlit as st
 import requests
 import datetime
+import streamlit.components.v1 as components
+
+# =====================================================================
+# [핵심 추가] 10분(600초) 단위 화면 자동 새로고침 기능
+# 대시보드를 켜두기만 해도 10분마다 스스로 화면을 갱신하여 최신 API를 호출합니다.
+# =====================================================================
+def auto_refresh(interval_seconds):
+    components.html(
+        f"""
+        <script>
+            setTimeout(function() {{
+                window.parent.location.reload();
+            }}, {interval_seconds * 1000});
+        </script>
+        """,
+        height=0, width=0,
+    )
+auto_refresh(600) # 600초 = 10분
 
 # =====================================================================
 # 1. 페이지 기본 설정 및 [선명한 텍스트 강조형] CSS 주입
@@ -11,66 +29,31 @@ def local_css():
     st.markdown("""
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
-            
             html, body, .stApp { font-family: 'Noto Sans KR', sans-serif; background-color: #F0F4F8; }
             header {visibility: hidden;}
             .main .block-container { padding-top: 1.5rem; padding-bottom: 2rem; padding-left: 2rem; padding-right: 2rem; }
             
-            /* 입력란(Input) 테두리 상시 노출 및 가독성 강화 */
-            div[data-baseweb="input"], div[data-baseweb="select"] > div {
-                background-color: #FFFFFF !important;
-                border: 1px solid #94A3B8 !important; 
-                border-radius: 6px !important;
-            }
-            div[data-baseweb="input"]:focus-within, div[data-baseweb="select"] > div:focus-within {
-                border-color: #1D4ED8 !important;
-                box-shadow: 0 0 0 1px #1D4ED8 !important;
-            }
-
-            /* 뉴스(이슈) 박스 UI 디자인 */
-            .news-box {
-                background-color: #ffffff;
-                border-left: 5px solid #EAB308;
-                padding: 12px 15px;
-                margin-bottom: 10px;
-                border-radius: 4px;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-                font-size: 15px;
-                color: #1E293B;
-            }
-
-            /* 탭 숨김 및 스타일링 */
-            div[data-baseweb="tab-highlight"] { display: none; }
+            div[data-baseweb="input"], div[data-baseweb="select"] > div { background-color: #FFFFFF !important; border: 1px solid #94A3B8 !important; border-radius: 6px !important; }
+            div[data-baseweb="input"]:focus-within, div[data-baseweb="select"] > div:focus-within { border-color: #1D4ED8 !important; box-shadow: 0 0 0 1px #1D4ED8 !important; }
             
-            [data-testid="stTabs"] button { 
-                background-color: #FFFFFF !important; 
-                border-radius: 8px !important; 
-                padding: 10px 16px !important; 
-                border: 2px solid #E2E8F0 !important; 
-                margin-right: 6px !important; 
-                transition: all 0.3s ease-in-out !important; 
-            }
+            .news-box { background-color: #ffffff; border-left: 5px solid #EAB308; padding: 12px 15px; margin-bottom: 10px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); font-size: 15px; color: #1E293B; }
+            
+            div[data-baseweb="tab-highlight"] { display: none; }
+            [data-testid="stTabs"] button { background-color: #FFFFFF !important; border-radius: 8px !important; padding: 10px 16px !important; border: 2px solid #E2E8F0 !important; margin-right: 6px !important; transition: all 0.3s ease-in-out !important; }
             [data-testid="stTabs"] button p { color: #64748B !important; font-weight: 500 !important; }
-
-            /* 각 탭별 선택 시 선명한 강조 색상 */
+            
             [data-testid="stTabs"] button:nth-of-type(1)[aria-selected="true"] { background-color: #EFF6FF !important; border-color: #1D4ED8 !important; }
             [data-testid="stTabs"] button:nth-of-type(1)[aria-selected="true"] p { color: #1D4ED8 !important; font-weight: 800 !important; }
-
             [data-testid="stTabs"] button:nth-of-type(2)[aria-selected="true"] { background-color: #F0FDFA !important; border-color: #0F766E !important; }
             [data-testid="stTabs"] button:nth-of-type(2)[aria-selected="true"] p { color: #0F766E !important; font-weight: 800 !important; }
-
             [data-testid="stTabs"] button:nth-of-type(3)[aria-selected="true"] { background-color: #FFF7ED !important; border-color: #C2410C !important; }
             [data-testid="stTabs"] button:nth-of-type(3)[aria-selected="true"] p { color: #C2410C !important; font-weight: 800 !important; }
-
             [data-testid="stTabs"] button:nth-of-type(4)[aria-selected="true"] { background-color: #FEF2F2 !important; border-color: #B91C1C !important; }
             [data-testid="stTabs"] button:nth-of-type(4)[aria-selected="true"] p { color: #B91C1C !important; font-weight: 800 !important; }
-
             [data-testid="stTabs"] button:nth-of-type(5)[aria-selected="true"] { background-color: #FAF5FF !important; border-color: #6D28D9 !important; }
             [data-testid="stTabs"] button:nth-of-type(5)[aria-selected="true"] p { color: #6D28D9 !important; font-weight: 800 !important; }
-
             [data-testid="stTabs"] button:nth-of-type(6)[aria-selected="true"] { background-color: #FEF3C7 !important; border-color: #B45309 !important; }
             [data-testid="stTabs"] button:nth-of-type(6)[aria-selected="true"] p { color: #B45309 !important; font-weight: 800 !important; }
-
             [data-testid="stTabs"] button:nth-of-type(7)[aria-selected="true"] { background-color: #F8FAFC !important; border-color: #334155 !important; }
             [data-testid="stTabs"] button:nth-of-type(7)[aria-selected="true"] p { color: #334155 !important; font-weight: 800 !important; }
         </style>
@@ -78,9 +61,10 @@ def local_css():
 local_css()
 
 # =====================================================================
-# 2. 공공데이터 API 실시간 호출 및 방어(Fallback) 로직
+# 2. 공공데이터 API 실시간 호출 (데이터 갱신 주기 10분으로 단축)
 # =====================================================================
-@st.cache_data(ttl=1800)
+# 캐시 유지시간(ttl)을 600초(10분)로 변경하여 항상 최신 API 데이터를 조회합니다.
+@st.cache_data(ttl=600)
 def get_weather_data():
     try:
         if "KMA_API_KEY" in st.secrets:
@@ -104,7 +88,25 @@ def get_weather_data():
         pass
     return {'temp': 28.5, 'humid': 60.0, 'rain': 0.0}
 
-@st.cache_data(ttl=43200)
+@st.cache_data(ttl=600)
+def get_kosha_daily_news():
+    try:
+        if "KOSHA_API_KEY" in st.secrets:
+            api_key = st.secrets["KOSHA_API_KEY"]
+            url = 'http://openapi.kosha.or.kr/openapi/service/rest/BoardService/getBoardList'
+            params = {'serviceKey': api_key, 'boardId': 'news', 'numOfRows': '3', 'type': 'json'}
+            response = requests.get(url, params=params, timeout=5)
+            items = response.json()['response']['body']['items']['item']
+            return [item.get('title', '') for item in items if item.get('title')]
+    except Exception:
+        pass
+    return [
+        "🚨 <b>[사고속보]</b> 타 현장 지붕 보수공사 중 채광창 파손 추락사고 발생 (유사작업 주의)",
+        "📜 <b>[법규안내]</b> 혹서기 근로자 휴게시설 설치 기준 및 에어컨 가동 집중 점검 기간",
+        "📢 <b>[캠페인]</b> 온열질환(열사병 등) 예방을 위한 '물·그늘·휴식' 3대 수칙 준수 강조"
+    ]
+
+@st.cache_data(ttl=43200) # 업종별 수칙은 자주 변하지 않으므로 12시간 유지
 def get_kosha_safety_rules(industry):
     try:
         if "KOSHA_API_KEY" in st.secrets:
@@ -117,7 +119,6 @@ def get_kosha_safety_rules(industry):
             if rules: return rules
     except Exception:
         pass
-
     fallback_db = {
         "시설관리": ["안전모, 안전대 등 개인보호구 착용 철저", "고소작업 시 추락방지망 및 안전난간 확인", "정비 작업 전 전원 차단(LOTO) 확행"],
         "청소": ["물기, 기름기 등에 의한 전도(넘어짐) 사고 주의", "화학세제 사용 시 물질안전보건자료(MSDS) 확인", "작업구간 미끄럼 주의 표지판 설치"],
@@ -129,33 +130,14 @@ def get_kosha_safety_rules(industry):
     }
     return fallback_db.get(industry, ["기본 안전보호구를 반드시 착용하세요."])
 
-@st.cache_data(ttl=43200)
-def get_kosha_daily_news():
-    """안전보건공단 API 연동 - 오늘의 안전보건 이슈 (사고속보, 법규 등)"""
-    try:
-        if "KOSHA_API_KEY" in st.secrets:
-            api_key = st.secrets["KOSHA_API_KEY"]
-            # 보도자료/속보 엔드포인트 예시
-            url = 'http://openapi.kosha.or.kr/openapi/service/rest/BoardService/getBoardList'
-            params = {'serviceKey': api_key, 'boardId': 'news', 'numOfRows': '3', 'type': 'json'}
-            response = requests.get(url, params=params, timeout=5)
-            items = response.json()['response']['body']['items']['item']
-            return [item.get('title', '') for item in items if item.get('title')]
-    except Exception:
-        pass
-    
-    # API 연결 전/장애 시 노출되는 리얼한 최신 EHS 이슈 DB (현재 시즌 반영)
-    return [
-        "🚨 <b>[사고속보]</b> 타 현장 지붕 보수공사 중 채광창 파손 추락사고 발생 (유사작업 주의)",
-        "📜 <b>[법규안내]</b> 혹서기 근로자 휴게시설 설치 기준 및 에어컨 가동 집중 점검 기간",
-        "📢 <b>[캠페인]</b> 온열질환(열사병 등) 예방을 위한 '물·그늘·휴식' 3대 수칙 준수 강조"
-    ]
-
 # =====================================================================
 # 3. 대시보드 화면 렌더링
 # =====================================================================
 st.markdown("<h2 style='text-align: center; color: #1e3a8a;'>🛡️ 협력사 일일 안전보건 정보 포털</h2>", unsafe_allow_html=True)
-st.caption(f"📅 **오늘의 날짜:** {datetime.date.today().strftime('%Y년 %m월 %d일')} (사외 접속 가능)")
+
+# 화면이 최신화되었는지 즉시 알 수 있도록 실시간 업데이트 시간 표시
+current_time_str = datetime.datetime.now().strftime('%Y년 %m월 %d일 %H:%M')
+st.caption(f"📅 **오늘의 날짜:** {current_time_str} 기준 (10분 단위 자동 업데이트 적용 완료)")
 
 # --- [날씨 섹션] ---
 st.subheader("📡 현장 실시간 기상 및 환경 지침 (수원 기준)")
@@ -176,11 +158,9 @@ else:
 
 st.divider()
 
-# --- [신규 추가: 오늘의 안전보건 이슈 섹션] ---
+# --- [이슈 섹션] ---
 st.subheader("📰 오늘의 안전보건 주요 이슈 (안전보건공단 제공)")
 daily_news = get_kosha_daily_news()
-
-# 뉴스 데이터를 시각적으로 깔끔한 박스 형태로 표출
 for news in daily_news:
     st.markdown(f"<div class='news-box'>{news}</div>", unsafe_allow_html=True)
 
@@ -190,7 +170,6 @@ st.divider()
 st.subheader("🏭 업종별 핵심 안전수칙 (클릭하여 확인하세요)")
 industry_list = ["시설관리", "청소", "물류", "식당", "서비스", "폐기물처리", "제조"]
 tabs = st.tabs(industry_list)
-
 for index, industry in enumerate(industry_list):
     with tabs[index]:
         kosha_rules = get_kosha_safety_rules(industry)
