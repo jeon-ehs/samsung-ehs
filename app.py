@@ -2,12 +2,15 @@ import streamlit as st
 import requests
 import datetime
 import urllib.parse
+import time
 from streamlit_autorefresh import st_autorefresh
 
 # =====================================================================
 # 1. 페이지 기본 설정 및 1분 단위 백그라운드 갱신
 # =====================================================================
 st.set_page_config(page_title="협력사 일일 안전 포털", page_icon="🛡️", layout="wide")
+
+# 전체 페이지는 1분(60초)마다 자동 새로고침 됨
 st_autorefresh(interval=60000, key="ehs_dashboard_refresh")
 
 def local_css():
@@ -36,8 +39,10 @@ def local_css():
 local_css()
 
 # =====================================================================
-# 2. API 데이터 호출 (1분 주기 캐시 적용)
+# 2. API 데이터 호출 (데이터 특성별 캐시 분리 적용)
 # =====================================================================
+
+# 기상 정보는 실시간성이 중요하므로 1분(60초) 캐시 유지
 @st.cache_data(ttl=60)
 def get_weather_data():
     try:
@@ -47,6 +52,7 @@ def get_weather_data():
             now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9)))
             if now.minute < 40: now = now - datetime.timedelta(hours=1)
             params = {'serviceKey': api_key, 'pageNo': '1', 'numOfRows': '10', 'dataType': 'JSON', 'base_date': now.strftime('%Y%m%d'), 'base_time': now.strftime('%H00'), 'nx': '60', 'ny': '121'}
+            
             response = requests.get(url, params=params, timeout=5)
             items = response.json()['response']['body']['items']['item']
             weather = {}
@@ -59,24 +65,39 @@ def get_weather_data():
         pass
     return {'temp': 28.5, 'humid': 60.0, 'rain': 0.0}
 
-@st.cache_data(ttl=60)
+# [해결책 2 반영] 뉴스/공단 데이터는 하루 단위 정적 성격이 강하므로 1시간(3600초) 단위 내부 DB(캐시)에 저장
+# 화면은 1분마다 새로고침 되지만 외부 API 호출은 1시간에 1번만 수행됨
+@st.cache_data(ttl=3600)
 def get_daily_news():
     news_list = []
+    
+    # 네이버 API 처리
     try: 
         if "NAVER_CLIENT_ID" in st.secrets and "NAVER_CLIENT_SECRET" in st.secrets:
             headers = {'X-Naver-Client-Id': st.secrets['NAVER_CLIENT_ID'], 'X-Naver-Client-Secret': st.secrets['NAVER_CLIENT_SECRET']}
             query = urllib.parse.quote("중대재해 OR 사고속보")
-            response = requests.get(f"https://openapi.naver.com/v1/search/news.json?query={query}&display=1&sort=sim", headers=headers, timeout=5)
+            # [해결책 3 반영] sort=sim (유사도순) -> sort=date (최신순)으로 변경하여 무조건 오늘 최신 뉴스가 오도록 수정
+            response = requests.get(f"https://openapi.naver.com/v1/search/news.json?query={query}&display=1&sort=date", headers=headers, timeout=5)
             if response.status_code == 200 and response.json().get('items'):
                 latest_news = response.json()['items'][0]
                 title = f"⚡ **[최신속보]** {latest_news['title'].replace('<b>', '').replace('</b>', '')}"
                 news_list.append({"title": title, "url": latest_news['link']})
     except Exception: pass
+
+    # 안전보건공단 API 처리
     try: 
         if "KOSHA_API_KEY" in st.secrets:
             api_key = st.secrets["KOSHA_API_KEY"]
             url = 'http://openapi.kosha.or.kr/openapi/service/rest/BoardService/getBoardList'
-            params = {'serviceKey': api_key, 'boardId': 'news', 'numOfRows': '2', 'type': 'json'}
+            # [해결책 3 반영] API 프록시 서버의 캐싱을 무력화하기 위해 의미 없는 타임스탬프 동적 파라미터(_t) 추가
+            current_timestamp = int(time.time())
+            params = {
+                'serviceKey': api_key, 
+                'boardId': 'news', 
+                'numOfRows': '2', 
+                'type': 'json',
+                '_t': current_timestamp 
+            }
             response = requests.get(url, params=params, timeout=5)
             items = response.json()['response']['body']['items']['item']
             for item in items:
@@ -86,14 +107,17 @@ def get_daily_news():
                 safe_link = f"https://search.naver.com/search.naver?query={search_query}"
                 news_list.append({"title": title, "url": safe_link})
     except Exception: pass
+
     if not news_list: 
         fallback_data = ["타 현장 지붕 보수공사 중 채광창 파손 추락사고 발생", "혹서기 근로자 휴게시설 설치 기준 및 에어컨 가동 집중 점검 기간"]
         for title in fallback_data:
             search_query = urllib.parse.quote(f"안전보건공단 {title}")
             safe_link = f"https://search.naver.com/search.naver?query={search_query}"
             news_list.append({"title": f"🚨 {title}", "url": safe_link})
+
     return news_list
 
+# 가이드라인은 변동이 거의 없으므로 12시간(43200초) 단위 캐시 적용
 @st.cache_data(ttl=43200)
 def get_kosha_safety_rules(industry):
     try:
@@ -105,6 +129,7 @@ def get_kosha_safety_rules(industry):
             rules = [item.get('subject', '') for item in response.json()['response']['body']['items']['item'] if item.get('subject')]
             if rules: return rules
     except Exception: pass
+    
     fallback_db = {"시설관리": ["안전모, 안전대 등 개인보호구 착용 철저", "고소작업 시 추락방지망 및 안전난간 확인", "정비 작업 전 전원 차단(LOTO) 확행"], "청소": ["물기, 기름기 등에 의한 전도(넘어짐) 사고 주의", "화학세제 사용 시 물질안전보건자료(MSDS) 확인", "작업구간 미끄럼 주의 표지판 설치"], "물류": ["지게차 작업 반경 내 보행자 접근 엄금", "중량물 취급 시 요통 등 근골격계 질환 주의", "적재물 낙하 방지 조치 및 하역 작업 지휘자 배치"], "식당": ["뜨거운 물/기름에 의한 화상 주의 및 방열장갑 착용", "바닥 물기 즉시 제거 및 미끄럼 방지 장화 착용", "식자재 운반 시 베임/찔림 주의"], "서비스": ["고객 응대 시 감정노동 스트레스 관리 및 휴식", "오랜 서서/앉아 일하는 작업 시 스트레칭 실시", "실내 적정 온도 및 환기 유지"], "폐기물처리": ["파쇄기, 압축기 끼임 방지를 위한 방호덮개 확인", "날카로운 물체 취급 시 베임 방지 장갑 착용", "밀폐공간 진입 전 산소/유해가스 농도 측정"], "제조": ["기계기구 회전부(기어, 롤러 등) 끼임 방지 덮개 설치", "소음/분진 발생 공정 시 귀마개 및 방진마스크 착용", "지게차, 크레인 등 운반기계 안전수칙 준수"]}
     return fallback_db.get(industry, ["기본 안전보호구를 반드시 착용하세요."])
 
@@ -125,6 +150,7 @@ c1, c2, c3 = st.columns(3)
 with c1: st.info(f"🌡️ **현재 기온:** {weather_data['temp']} ℃")
 with c2: st.info(f"💧 **현재 습도:** {weather_data['humid']} %")
 with c3: st.info(f"☔ **강수량:** {weather_data['rain']} mm")
+
 if weather_data['temp'] >= 33.0: st.error("🚨 **[폭염 경보]** 온열질환 발생 위험! 옥외작업 최소화 및 휴식을 보장하세요.")
 elif weather_data['temp'] <= -5.0: st.info("🚨 **[한파 주의]** 동절기 한랭질환 및 빙판길 미끄러짐에 주의하세요.")
 elif weather_data['rain'] > 0.0: st.warning("☔ **[강우 주의]** 감전 및 미끄러짐 재해 위험이 높습니다.")
@@ -171,7 +197,7 @@ if submitted:
         rules_data = get_kosha_safety_rules(selected_industry)
         rules_text = "\n".join([f"  - {rule}" for rule in rules_data])
         
-        # 2. [추가됨] 주요 이슈 텍스트 정리 (마크다운 ** 기호를 제거하여 카톡 등에서 깔끔하게 보이도록 처리)
+        # 2. 주요 이슈 텍스트 정리
         issue_text = "\n".join([f"  - {news['title'].replace('**', '')}" for news in news_data])
         
         # 3. TBM 텍스트 조립
