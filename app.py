@@ -9,7 +9,7 @@ from streamlit_autorefresh import st_autorefresh
 from datetime import timezone, timedelta
 
 # =====================================================================
-# 1. 페이지 기본 설정 및 자동 갱신 (앱 사이트명 변경)
+# 1. 페이지 기본 설정 및 자동 갱신
 # =====================================================================
 st.set_page_config(
     page_title="협력사 안전보건 정보제공",
@@ -22,7 +22,7 @@ st.set_page_config(
 st_autorefresh(interval=60000, key="ehs_dashboard_refresh")
 
 # =====================================================================
-# 2. 대시보드 맞춤형 CSS 스타일링 (운영진 대시보드 테마)
+# 2. 대시보드 맞춤형 CSS 스타일링
 # =====================================================================
 def dashboard_css():
     st.markdown("""
@@ -45,7 +45,7 @@ def dashboard_css():
             /* 카드 공통 스타일 */
             .dash-card {
                 background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px;
-                padding: 20px; box-shadow: 0 1px 3px 0 rgba(0,0,0,0.05); height: 100%; margin-bottom: 20px;
+                padding: 20px; box-shadow: 0 1px 3px 0 rgba(0,0,0,0.05); margin-bottom: 20px;
             }
             .card-header {
                 font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 16px;
@@ -95,9 +95,23 @@ def dashboard_css():
 dashboard_css()
 
 # =====================================================================
-# 3. 실시간 API 연동 로직
+# 3. 텍스트 세척 및 API 연동 로직
 # =====================================================================
 kst = timezone(timedelta(hours=9))
+
+# [핵심] HTML 태그 및 코드명 원천 제거 함수
+def clean_html_text(raw_text):
+    if not raw_text:
+        return ""
+    # 1. <b>, </b> 등 모든 형태의 HTML 태그 제거
+    text = re.sub(r'<[^>]+>', '', raw_text)
+    # 2. &quot; &amp; 등 HTML 엔티티 1차 디코딩
+    text = html.unescape(text)
+    # 3. 이중 인코딩된 경우를 대비해 2차 디코딩
+    text = html.unescape(text)
+    # 4. 불필요한 슬래시 잔재 제거
+    text = text.replace('\\"', '"').replace('\\\'', "'")
+    return text.strip()
 
 @st.cache_data(ttl=60)
 def get_weather_data():
@@ -138,10 +152,8 @@ def get_daily_news():
             
             if res.status_code == 200 and res.json().get('items'):
                 for item in res.json()['items']:
-                    # [수정] HTML 엔티티(&quot; 등) 디코딩 및 태그(<b> 등) 완벽 제거
-                    raw_title = item['title']
-                    unescaped_title = html.unescape(raw_title) # &quot; -> " 변환
-                    clean_title = re.sub(r'<[^>]+>', '', unescaped_title) # HTML 태그 제거
+                    # 세척 함수를 통해 깨끗한 텍스트만 추출
+                    clean_title = clean_html_text(item['title'])
                     
                     news_list.append({
                         "title": f"⚡ [속보] {clean_title[:70]}...",
@@ -154,20 +166,18 @@ def get_daily_news():
         news_list = [{"title": "🚨 [시스템] 실시간 뉴스를 불러오는 중입니다...", "url": "#", "time": timestamp}]
     return news_list
 
-# [수정] 일일 단위 업데이트 (ttl=86400, 24시간) 및 max 5개 제한
 @st.cache_data(ttl=86400)
 def get_kosha_safety_rules(industry):
     try:
         if "KOSHA_API_KEY" in st.secrets:
             url = 'http://openapi.kosha.or.kr/openapi/service/rest/SafeHealthInfoService/getIndustrySafeGuide'
-            # numOfRows를 5로 설정하여 최대 5개 가져오기
             params = {'serviceKey': st.secrets["KOSHA_API_KEY"], 'searchKeyword': industry, 'type': 'json', 'numOfRows': '5'}
             res = requests.get(url, params=params, timeout=5)
             if res.status_code == 200:
                 items = res.json()['response']['body']['items'].get('item', [])
                 if not isinstance(items, list): items = [items]
-                rules = [item.get('subject', '') for item in items if item.get('subject')]
-                if rules: return rules[:5] # 최대 5개까지만 반환
+                rules = [clean_html_text(item.get('subject', '')) for item in items if item.get('subject')]
+                if rules: return rules[:5]
     except Exception: pass
     
     fallback_db = {
@@ -182,12 +192,12 @@ def get_kosha_safety_rules(industry):
     return fallback_db.get(industry, ["기본 안전보호구를 반드시 착용하세요."])[:5]
 
 # =====================================================================
-# 4. 화면 렌더링 (2x2 그리드 배열)
+# 4. 화면 렌더링 (좌/우 단일 Column 구조로 완벽한 간격 제어)
 # =====================================================================
 current_time_str = datetime.datetime.now(kst).strftime('%Y-%m-%d %H:%M')
 industry_list = ["시설관리", "청소", "물류", "제조", "식당", "서비스", "폐기물처리"]
 
-# 상단 대시보드 타이틀 (이름 변경 반영)
+# 상단 대시보드 타이틀
 st.markdown(f"""
     <div class="dashboard-header">
         <h2 class="dashboard-title">협력사 안전보건 정보제공 DASHBOARD</h2>
@@ -195,10 +205,12 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# 그리드 Row 1: 기상 정보(좌) / 안전수칙(우)
-row1_col1, row1_col2 = st.columns(2)
+# [핵심] 좌/우 2개의 기둥으로 나누어 각각 쌓아 올리는 방식 적용
+left_col, right_col = st.columns(2, gap="large")
 
-with row1_col1:
+# ----------------- 좌측 단 (기상 + 뉴스) -----------------
+with left_col:
+    # 1. 기상 정보 카드
     weather_data = get_weather_data()
     temp, humid, rain = weather_data['temp'], weather_data['humid'], weather_data['rain']
     weather_msg = "✅ 기상 악화 요인 없음 (정상 작업 가능)" if -5.0 < temp < 33.0 and rain == 0 else "⚠️ 기상 주의 (폭염/강우/한파 안전대책 요망)"
@@ -215,21 +227,7 @@ with row1_col1:
         </div>
     """, unsafe_allow_html=True)
 
-with row1_col2:
-    st.markdown('<div style="font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">업종별 핵심 안전수칙 <span style="font-size: 12px; color: #94a3b8; font-weight: 400; margin-left: 8px;">Safety Rules</span></div>', unsafe_allow_html=True)
-    selected_ind_view = st.selectbox("업종 선택", industry_list, label_visibility="collapsed")
-    
-    rules = get_kosha_safety_rules(selected_ind_view)
-    rules_html = '<div class="dash-card" style="margin-top:-10px;">'
-    for idx, rule in enumerate(rules, 1):
-        rules_html += f'<div class="rule-item"><span class="rule-num">{idx}</span> {rule}</div>'
-    rules_html += '</div>'
-    st.markdown(rules_html, unsafe_allow_html=True)
-
-# 그리드 Row 2: 실시간 뉴스(좌) / TBM 폼(우)
-row2_col1, row2_col2 = st.columns(2)
-
-with row2_col1:
+    # 2. 뉴스 카드 (기상 카드 바로 아래에 동일한 간격으로 붙음)
     news_data = get_daily_news()
     news_html = '<div class="dash-card"><div class="card-header">실시간 주요이슈 <span class="card-header-sub">Safety News</span></div>'
     for news in news_data:
@@ -242,7 +240,20 @@ with row2_col1:
     news_html += '</div>'
     st.markdown(news_html, unsafe_allow_html=True)
 
-with row2_col2:
+# ----------------- 우측 단 (안전수칙 + TBM 폼) -----------------
+with right_col:
+    # 3. 안전수칙 구역
+    st.markdown('<div style="font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">업종별 핵심 안전수칙 <span style="font-size: 12px; color: #94a3b8; font-weight: 400; margin-left: 8px;">Safety Rules</span></div>', unsafe_allow_html=True)
+    selected_ind_view = st.selectbox("업종 선택", industry_list, label_visibility="collapsed")
+    
+    rules = get_kosha_safety_rules(selected_ind_view)
+    rules_html = '<div class="dash-card" style="margin-top:-10px;">'
+    for idx, rule in enumerate(rules, 1):
+        rules_html += f'<div class="rule-item"><span class="rule-num">{idx}</span> {rule}</div>'
+    rules_html += '</div>'
+    st.markdown(rules_html, unsafe_allow_html=True)
+
+    # 4. TBM 확인서 폼
     st.markdown('<div style="font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">일일 TBM 모바일 확인서 발급 <span style="font-size: 12px; color: #94a3b8; font-weight: 400; margin-left: 8px;">TBM Form</span></div>', unsafe_allow_html=True)
     with st.form("tbm_form"):
         f_col1, f_col2 = st.columns(2)
@@ -254,7 +265,7 @@ with row2_col2:
         selected_industry_form = st.selectbox("🛠️ 금일 작업 업종", industry_list)
         submitted = st.form_submit_button("🖨️ 확인서 발급 생성", use_container_width=True)
 
-# TBM 폼 제출 결과 (폼 바로 아래에 표시)
+# ----------------- 하단 (TBM 폼 제출 결과) -----------------
 if submitted and contractor_name:
     form_rules = "\n".join([f"  {idx}. {rule}" for idx, rule in enumerate(get_kosha_safety_rules(selected_industry_form), 1)])
     form_news = "\n".join([f"  • {news['title'].replace('⚡ [속보] ', '').strip()[:50]}" for news in news_data[:3]])
