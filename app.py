@@ -20,7 +20,7 @@ st.set_page_config(
 st_autorefresh(interval=60000, key="ehs_dashboard_refresh")
 
 # =====================================================================
-# 2. 고급 CSS 스타일링 (기상 박스 제거 및 폰트 대형화 유지)
+# 2. 고급 CSS 스타일링
 # =====================================================================
 def advanced_css():
     st.markdown("""
@@ -63,9 +63,8 @@ def advanced_css():
 advanced_css()
 
 # =====================================================================
-# 3. 실시간 API 연동 로직 (네이버 뉴스 & 안전보건공단)
+# 3. 실시간 API 연동 로직 (기상청, 네이버 뉴스 & 안전보건공단)
 # =====================================================================
-
 kst = timezone(timedelta(hours=9))
 
 @st.cache_data(ttl=60)
@@ -94,23 +93,23 @@ def get_weather_data():
     except Exception: pass
     return {'temp': 28.5, 'humid': 60.0, 'rain': 0.0, 'fetch_time': fetch_time}
 
-# [핵심] 네이버 API를 통해 중대재해 실시간 주요이슈 가져오기 (5분마다 자동 갱신)
+# [수정됨] 네이버 API를 통해 안전보건 및 중대재해 실시간 주요이슈 최대 5개 가져오기
 @st.cache_data(ttl=300)
 def get_daily_news():
     news_list = []
     current_time = datetime.datetime.now(kst)
     timestamp = current_time.strftime('%Y-%m-%d %H:%M:%S')
     
-    # 네이버 뉴스 검색 API 호출 (최신순 정렬)
     try:
         if "NAVER_CLIENT_ID" in st.secrets and "NAVER_CLIENT_SECRET" in st.secrets:
             headers = {
                 'X-Naver-Client-Id': st.secrets['NAVER_CLIENT_ID'],
                 'X-Naver-Client-Secret': st.secrets['NAVER_CLIENT_SECRET']
             }
-            # 검색어: 중대재해 또는 산업재해 속보
-            query = urllib.parse.quote("중대재해 OR 사고속보 OR 산업재해")
-            res = requests.get(f"https://openapi.naver.com/v1/search/news.json?query={query}&display=4&sort=date", headers=headers, timeout=5)
+            # 안전보건 주요이슈 및 중대재해 검색어 반영
+            query = urllib.parse.quote("안전보건 OR 중대재해 OR 사고속보")
+            # 최대 5개 가져오기 설정 (display=5)
+            res = requests.get(f"https://openapi.naver.com/v1/search/news.json?query={query}&display=5&sort=date", headers=headers, timeout=5)
             
             if res.status_code == 200 and res.json().get('items'):
                 for idx, item in enumerate(res.json()['items']):
@@ -123,14 +122,13 @@ def get_daily_news():
                     })
     except Exception: pass
 
-    # 만약 API 오류로 뉴스가 안 불러와지면 보여줄 기본(폴백) 데이터
+    # API 오류 시 기본 데이터 5개 구성
     if not news_list:
         news_list = [
-            {"title": "🚨 [시스템] 현재 실시간 뉴스를 불러오는 중입니다...", "url": "https://search.naver.com/search.naver?query=중대재해", "time": timestamp, "priority": "critical"}
+            {"title": "🚨 [시스템] 실시간 뉴스를 불러오는 중입니다...", "url": "https://search.naver.com/search.naver?query=중대재해", "time": timestamp, "priority": "critical"}
         ]
     return news_list
 
-# [핵심] 안전보건공단 업종별 가이드 API (12시간마다 자동 갱신)
 @st.cache_data(ttl=43200)
 def get_kosha_safety_rules(industry):
     try:
@@ -147,7 +145,6 @@ def get_kosha_safety_rules(industry):
                 if rules: return rules
     except Exception: pass
     
-    # API 실패 시 보여줄 매일 기본 안전수칙
     fallback_db = {
         "시설관리": ["안전모, 안전대 등 개인보호구 착용 철저", "고소작업 시 추락방지망 및 안전난간 확인", "정비 작업 전 전원 차단(LOTO) 실행"],
         "청소": ["물기, 기름기 등에 의한 전도(넘어짐) 사고 주의", "화학세제 사용 시 물질안전보건자료(MSDS) 확인"],
@@ -178,9 +175,10 @@ st.caption(f"🕒 업데이트 시간: {weather_data.get('fetch_time', current_k
 temp, humid, rain = weather_data['temp'], weather_data['humid'], weather_data['rain']
 
 w1, w2, w3 = st.columns(3)
-with w1: st.markdown(f"<div style='text-align: center;'><div style='font-size: 2.8em; font-weight: 900; color: #1D4ED8;'>🌡️ {temp}℃</div><div style='color: #475569;'>현재 기온</div></div>", unsafe_allow_html=True)
-with w2: st.markdown(f"<div style='text-align: center;'><div style='font-size: 2.8em; font-weight: 900; color: #1D4ED8;'>💧 {humid}%</div><div style='color: #475569;'>현재 습도</div></div>", unsafe_allow_html=True)
-with w3: st.markdown(f"<div style='text-align: center;'><div style='font-size: 2.8em; font-weight: 900; color: #1D4ED8;'>☔ {rain}mm</div><div style='color: #475569;'>강수량</div></div>", unsafe_allow_html=True)
+# [수정됨] 기온: 빨간색, 습도: 주황색, 강수량: 파란색으로 색상 지정
+with w1: st.markdown(f"<div style='text-align: center;'><div style='font-size: 2.8em; font-weight: 900; color: #DC2626;'>🌡️ {temp}℃</div><div style='color: #475569;'>현재 기온</div></div>", unsafe_allow_html=True)
+with w2: st.markdown(f"<div style='text-align: center;'><div style='font-size: 2.8em; font-weight: 900; color: #EA580C;'>💧 {humid}%</div><div style='color: #475569;'>현재 습도</div></div>", unsafe_allow_html=True)
+with w3: st.markdown(f"<div style='text-align: center;'><div style='font-size: 2.8em; font-weight: 900; color: #2563EB;'>☔ {rain}mm</div><div style='color: #475569;'>강수량</div></div>", unsafe_allow_html=True)
 
 weather_msg = "✅ 기상 악화 요인 없음" if temp < 33.0 and temp > -5.0 and rain == 0 else "⚠️ 기상 주의 (폭염/강우/한파 확인)"
 st.divider()
@@ -220,7 +218,8 @@ with st.form("tbm_form"):
 
 if submitted and contractor_name:
     rules_text = "\n".join([f"  {idx}. {rule}" for idx, rule in enumerate(get_kosha_safety_rules(selected_industry), 1)])
-    issue_text = "\n".join([f"  • {news['title'].replace('⚡ [네이버 속보] ', '').strip()[:60]}" for news in news_data[:3]])
+    # [수정됨] 생성되는 TBM에도 최대 5개의 뉴스가 포함되도록 수정
+    issue_text = "\n".join([f"  • {news['title'].replace('⚡ [네이버 속보] ', '').strip()[:60]}" for news in news_data[:5]])
     
     tbm_result = f"""=========================================
 [ 📋 일일 TBM 무재해 이행 확인서 ]
