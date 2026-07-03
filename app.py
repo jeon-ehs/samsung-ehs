@@ -21,7 +21,7 @@ st.set_page_config(
 st_autorefresh(interval=60000, key="ehs_dashboard_refresh")
 
 # =====================================================================
-# 2. 고급 CSS 스타일링 (그래픽 가독성 강화 및 폰트 사이즈 조정)
+# 2. 고급 CSS 스타일링
 # =====================================================================
 def advanced_css():
     st.markdown("""
@@ -56,28 +56,6 @@ def advanced_css():
             .card-warning { border-left-color: #F59E0B; background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); }
             .card-danger { border-left-color: #EF4444; background: linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%); }
             .card-critical { border-left-color: #DC2626; background: linear-gradient(135deg, #7F1D1D 0%, #991B1B 100%); color: white; }
-            
-            /* 날씨 정보 박스 (폰트 크기 및 여백 축소) */
-            .weather-box {
-                background: linear-gradient(135deg, #ECF0FF 0%, #F0F9FF 100%);
-                border: 2px solid #1D4ED8;
-                border-radius: 12px;
-                padding: 15px;
-                text-align: center;
-                box-shadow: 0 4px 12px rgba(29, 78, 216, 0.15);
-            }
-            .weather-value {
-                font-size: 1.8em; /* 기존 2.5em에서 축소 */
-                font-weight: 900;
-                color: #1D4ED8;
-                line-height: 1.2;
-            }
-            .weather-label {
-                font-size: 0.9em;
-                color: #475569;
-                margin-top: 4px;
-                font-weight: 600;
-            }
             
             /* 뉴스/이슈 박스 */
             .news-box {
@@ -190,7 +168,6 @@ def advanced_css():
             /* 반응형 레이아웃 */
             @media (max-width: 768px) {
                 .main .block-container { padding-left: 1rem; padding-right: 1rem; }
-                .weather-value { font-size: 1.5em; }
                 .news-title { font-size: 14px; }
             }
         </style>
@@ -232,7 +209,7 @@ def get_weather_data():
                 if weather:
                     return weather
     except Exception as e:
-        st.error(f"기상 데이터 로드 실패: {str(e)}")
+        pass
     
     return {'temp': 28.5, 'humid': 60.0, 'rain': 0.0}
 
@@ -267,10 +244,10 @@ def get_daily_news():
                         "time": timestamp,
                         "priority": "high" if idx == 0 else "medium"
                     })
-    except Exception as e:
+    except Exception:
         pass
 
-    # 2. 안전보건공단 API (클릭 시 네이버 검색으로 연동되도록 수정)
+    # 2. 안전보건공단 API (클릭 시 네이버 검색으로 연동)
     try:
         if "KOSHA_API_KEY" in st.secrets:
             api_key = st.secrets["KOSHA_API_KEY"]
@@ -288,7 +265,6 @@ def get_daily_news():
                     for item in items[:3]:
                         title = item.get('title', '').strip()
                         if title and len(title) > 5:
-                            # 공단 메인 홈페이지 대신 네이버 검색결과 창으로 연결
                             search_query = urllib.parse.quote(f"안전보건공단 {title}")
                             safe_link = f"https://search.naver.com/search.naver?query={search_query}"
                             news_list.append({
@@ -369,8 +345,8 @@ with col2:
     )
 st.divider()
 
-# --- 기상 정보 섹션 ---
-st.subheader("📡 현장 실시간 기상 정보 (수원 기준)")
+# --- 기상 정보 섹션 (수치 박스 제거 후 경보 메시지만 유지) ---
+st.subheader("📡 현장 실시간 기상 알림 (수원 기준)")
 weather_data = get_weather_data()
 temp, humid, rain = weather_data['temp'], weather_data['humid'], weather_data['rain']
 
@@ -383,14 +359,11 @@ elif rain > 0.0:
 else:
     weather_status, weather_level, weather_message, status_color = "✅ 정상", "safe", "현재 특별한 기상 악화 위험은 없습니다.", "#10B981"
 
-weather_col1, weather_col2, weather_col3 = st.columns(3)
-with weather_col1: st.markdown(f"<div class='weather-box'><div class='weather-value'>🌡️ {temp}℃</div><div class='weather-label'>현재 기온</div></div>", unsafe_allow_html=True)
-with weather_col2: st.markdown(f"<div class='weather-box'><div class='weather-value'>💧 {humid}%</div><div class='weather-label'>현재 습도</div></div>", unsafe_allow_html=True)
-with weather_col3: st.markdown(f"<div class='weather-box'><div class='weather-value'>☔ {rain}mm</div><div class='weather-label'>강수량</div></div>", unsafe_allow_html=True)
-
 st.markdown(
     f"""<div class='metric-card card-{weather_level}'>
-        <p style='font-size: 16px; font-weight: 700; margin: 0 0 8px 0; color: {status_color};'>{weather_status}</p>
+        <p style='font-size: 16px; font-weight: 700; margin: 0 0 8px 0; color: {status_color};'>
+            {weather_status} (🌡️ 현재 기온: {temp}℃ / ☔ 강수량: {rain}mm)
+        </p>
         <p style='font-size: 14px; font-weight: 500; margin: 0; color: #475569;'>{weather_message}</p>
     </div>""", unsafe_allow_html=True
 )
@@ -431,7 +404,7 @@ for index, industry in enumerate(industry_list):
             )
 st.divider()
 
-# --- TBM 확인서 섹션 (서명란 간소화) ---
+# --- TBM 확인서 섹션 ---
 st.subheader("📋 일일 TBM(Tool Box Meeting) 모바일 확인서 생성")
 with st.form("tbm_form"):
     st.markdown("### 📝 작업 정보 입력")
