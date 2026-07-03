@@ -99,17 +99,12 @@ dashboard_css()
 # =====================================================================
 kst = timezone(timedelta(hours=9))
 
-# [핵심] HTML 태그 및 코드명 원천 제거 함수
 def clean_html_text(raw_text):
     if not raw_text:
         return ""
-    # 1. <b>, </b> 등 모든 형태의 HTML 태그 제거
     text = re.sub(r'<[^>]+>', '', raw_text)
-    # 2. &quot; &amp; 등 HTML 엔티티 1차 디코딩
     text = html.unescape(text)
-    # 3. 이중 인코딩된 경우를 대비해 2차 디코딩
     text = html.unescape(text)
-    # 4. 불필요한 슬래시 잔재 제거
     text = text.replace('\\"', '"').replace('\\\'', "'")
     return text.strip()
 
@@ -123,7 +118,7 @@ def get_weather_data():
             params = {
                 'serviceKey': st.secrets["KMA_API_KEY"], 'pageNo': '1', 'numOfRows': '10', 'dataType': 'JSON',
                 'base_date': now.strftime('%Y%m%d'), 'base_time': now.strftime('%H00'),
-                'nx': '60', 'ny': '121' # 수원 기준
+                'nx': '60', 'ny': '121'
             }
             res = requests.get(url, params=params, timeout=5)
             if res.status_code == 200:
@@ -152,9 +147,7 @@ def get_daily_news():
             
             if res.status_code == 200 and res.json().get('items'):
                 for item in res.json()['items']:
-                    # 세척 함수를 통해 깨끗한 텍스트만 추출
                     clean_title = clean_html_text(item['title'])
-                    
                     news_list.append({
                         "title": f"⚡ [속보] {clean_title[:70]}...",
                         "url": item['link'],
@@ -181,7 +174,7 @@ def get_kosha_safety_rules(industry):
     except Exception: pass
     
     fallback_db = {
-        "시설관리": ["안전모, 안전대 등 개인보호구 착용 철저", "고소작업 시 추락방지망 및 안전난간 확인", "정비 작업 전 전원 차단(LOTO) 실행", "사다리 작업 시 2인 1조 준수", "밀폐공간 진입 전 산소농도 측정"],
+        "시설관리": ["안전모, 안전대 등 개인보호구 착용 철저", "고소작업 시 추락방지망 및 안전난간 확인", "정비 작업 전 전원 차단(LOTO) 실행", "사다 작업 시 2인 1조 준수", "밀폐공간 진입 전 산소농도 측정"],
         "청소": ["물기, 기름기 등에 의한 전도(넘어짐) 사고 주의", "화학세제 사용 시 물질안전보건자료(MSDS) 확인", "안전표지판(미끄럼 주의) 설치 철저"],
         "물류": ["지게차 작업 반경 내 보행자 접근 엄금", "중량물 취급 시 요통 등 근골격계 질환 주의", "상하차 작업 시 작업지휘자 배치"],
         "제조": ["기계기구 회전부(기어, 롤러 등) 끼임 방지 덮개 설치", "소음/분진 발생 공정 시 귀마개 착용", "지게차 운행 시 제한속도 준수"],
@@ -192,57 +185,39 @@ def get_kosha_safety_rules(industry):
     return fallback_db.get(industry, ["기본 안전보호구를 반드시 착용하세요."])[:5]
 
 # =====================================================================
-# 4. 화면 렌더링 (좌/우 단일 Column 구조로 완벽한 간격 제어)
+# 4. 화면 렌더링 (코드 노출 원천 차단 및 간격 동기화)
 # =====================================================================
 current_time_str = datetime.datetime.now(kst).strftime('%Y-%m-%d %H:%M')
 industry_list = ["시설관리", "청소", "물류", "제조", "식당", "서비스", "폐기물처리"]
 
-# 상단 대시보드 타이틀
-st.markdown(f"""
-    <div class="dashboard-header">
-        <h2 class="dashboard-title">협력사 안전보건 정보제공 DASHBOARD</h2>
-        <span class="dashboard-time">🔄 동기화 기준: {current_time_str}</span>
-    </div>
-""", unsafe_allow_html=True)
+# 헤더 (들여쓰기 없는 한 줄 HTML로 처리)
+header_html = f'<div class="dashboard-header"><h2 class="dashboard-title">협력사 안전보건 정보제공 DASHBOARD</h2><span class="dashboard-time">🔄 동기화 기준: {current_time_str}</span></div>'
+st.markdown(header_html, unsafe_allow_html=True)
 
-# [핵심] 좌/우 2개의 기둥으로 나누어 각각 쌓아 올리는 방식 적용
+# 2기둥 레이아웃
 left_col, right_col = st.columns(2, gap="large")
 
-# ----------------- 좌측 단 (기상 + 뉴스) -----------------
+# ----------------- 좌측 단 -----------------
 with left_col:
-    # 1. 기상 정보 카드
     weather_data = get_weather_data()
     temp, humid, rain = weather_data['temp'], weather_data['humid'], weather_data['rain']
     weather_msg = "✅ 기상 악화 요인 없음 (정상 작업 가능)" if -5.0 < temp < 33.0 and rain == 0 else "⚠️ 기상 주의 (폭염/강우/한파 안전대책 요망)"
     
-    st.markdown(f"""
-        <div class="dash-card">
-            <div class="card-header">현장 기상정보 <span class="card-header-sub">Weather Status</span></div>
-            <div class="weather-wrap">
-                <div><div class="w-label">현재 기온</div><div class="w-val c-temp">{temp}℃</div></div>
-                <div><div class="w-label">현재 습도</div><div class="w-val c-humid">{humid}%</div></div>
-                <div><div class="w-label">강수량</div><div class="w-val c-rain">{rain}mm</div></div>
-            </div>
-            <div class="w-status">{weather_msg}</div>
-        </div>
-    """, unsafe_allow_html=True)
+    # 1. 기상 정보 카드 (한 줄 텍스트 처리로 마크다운 오류 원천 차단)
+    weather_html = f'<div class="dash-card"><div class="card-header">현장 기상정보 <span class="card-header-sub">Weather Status</span></div><div class="weather-wrap"><div><div class="w-label">현재 기온</div><div class="w-val c-temp">{temp}℃</div></div><div><div class="w-label">현재 습도</div><div class="w-val c-humid">{humid}%</div></div><div><div class="w-label">강수량</div><div class="w-val c-rain">{rain}mm</div></div></div><div class="w-status">{weather_msg}</div></div>'
+    st.markdown(weather_html, unsafe_allow_html=True)
 
-    # 2. 뉴스 카드 (기상 카드 바로 아래에 동일한 간격으로 붙음)
+    # 2. 실시간 주요 이슈 카드 (한 줄 텍스트 결합 방식)
     news_data = get_daily_news()
     news_html = '<div class="dash-card"><div class="card-header">실시간 주요이슈 <span class="card-header-sub">Safety News</span></div>'
     for news in news_data:
-        news_html += f"""
-        <div class="news-item">
-            <a href="{news['url']}" target="_blank" class="news-title">{news['title']}</a>
-            <div class="news-date">{news['time']} 업데이트</div>
-        </div>
-        """
+        news_html += f'<div class="news-item"><a href="{news["url"]}" target="_blank" class="news-title">{news["title"]}</a><div class="news-date">{news["time"]} 업데이트</div></div>'
     news_html += '</div>'
     st.markdown(news_html, unsafe_allow_html=True)
 
-# ----------------- 우측 단 (안전수칙 + TBM 폼) -----------------
+# ----------------- 우측 단 -----------------
 with right_col:
-    # 3. 안전수칙 구역
+    # 3. 업종별 핵심 안전수칙 카드
     st.markdown('<div style="font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">업종별 핵심 안전수칙 <span style="font-size: 12px; color: #94a3b8; font-weight: 400; margin-left: 8px;">Safety Rules</span></div>', unsafe_allow_html=True)
     selected_ind_view = st.selectbox("업종 선택", industry_list, label_visibility="collapsed")
     
@@ -253,7 +228,7 @@ with right_col:
     rules_html += '</div>'
     st.markdown(rules_html, unsafe_allow_html=True)
 
-    # 4. TBM 확인서 폼
+    # 4. TBM 확인서 발급 폼
     st.markdown('<div style="font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">일일 TBM 모바일 확인서 발급 <span style="font-size: 12px; color: #94a3b8; font-weight: 400; margin-left: 8px;">TBM Form</span></div>', unsafe_allow_html=True)
     with st.form("tbm_form"):
         f_col1, f_col2 = st.columns(2)
@@ -265,7 +240,7 @@ with right_col:
         selected_industry_form = st.selectbox("🛠️ 금일 작업 업종", industry_list)
         submitted = st.form_submit_button("🖨️ 확인서 발급 생성", use_container_width=True)
 
-# ----------------- 하단 (TBM 폼 제출 결과) -----------------
+# ----------------- TBM 생성 결과 -----------------
 if submitted and contractor_name:
     form_rules = "\n".join([f"  {idx}. {rule}" for idx, rule in enumerate(get_kosha_safety_rules(selected_industry_form), 1)])
     form_news = "\n".join([f"  • {news['title'].replace('⚡ [속보] ', '').strip()[:50]}" for news in news_data[:3]])
