@@ -93,7 +93,6 @@ def get_weather_data():
     except Exception: pass
     return {'temp': 28.5, 'humid': 60.0, 'rain': 0.0, 'fetch_time': fetch_time}
 
-# [수정됨] 네이버 API를 통해 안전보건 및 중대재해 실시간 주요이슈 최대 5개 가져오기
 @st.cache_data(ttl=300)
 def get_daily_news():
     news_list = []
@@ -106,9 +105,7 @@ def get_daily_news():
                 'X-Naver-Client-Id': st.secrets['NAVER_CLIENT_ID'],
                 'X-Naver-Client-Secret': st.secrets['NAVER_CLIENT_SECRET']
             }
-            # 안전보건 주요이슈 및 중대재해 검색어 반영
             query = urllib.parse.quote("안전보건 OR 중대재해 OR 사고속보")
-            # 최대 5개 가져오기 설정 (display=5)
             res = requests.get(f"https://openapi.naver.com/v1/search/news.json?query={query}&display=5&sort=date", headers=headers, timeout=5)
             
             if res.status_code == 200 and res.json().get('items'):
@@ -122,7 +119,6 @@ def get_daily_news():
                     })
     except Exception: pass
 
-    # API 오류 시 기본 데이터 5개 구성
     if not news_list:
         news_list = [
             {"title": "🚨 [시스템] 실시간 뉴스를 불러오는 중입니다...", "url": "https://search.naver.com/search.naver?query=중대재해", "time": timestamp, "priority": "critical"}
@@ -175,9 +171,9 @@ st.caption(f"🕒 업데이트 시간: {weather_data.get('fetch_time', current_k
 temp, humid, rain = weather_data['temp'], weather_data['humid'], weather_data['rain']
 
 w1, w2, w3 = st.columns(3)
-# [수정됨] 기온: 빨간색, 습도: 주황색, 강수량: 파란색으로 색상 지정
+# [수정됨] 기온: 빨간색, 습도: 녹색(#16A34A), 강수량: 파란색으로 색상 지정
 with w1: st.markdown(f"<div style='text-align: center;'><div style='font-size: 2.8em; font-weight: 900; color: #DC2626;'>🌡️ {temp}℃</div><div style='color: #475569;'>현재 기온</div></div>", unsafe_allow_html=True)
-with w2: st.markdown(f"<div style='text-align: center;'><div style='font-size: 2.8em; font-weight: 900; color: #EA580C;'>💧 {humid}%</div><div style='color: #475569;'>현재 습도</div></div>", unsafe_allow_html=True)
+with w2: st.markdown(f"<div style='text-align: center;'><div style='font-size: 2.8em; font-weight: 900; color: #16A34A;'>💧 {humid}%</div><div style='color: #475569;'>현재 습도</div></div>", unsafe_allow_html=True)
 with w3: st.markdown(f"<div style='text-align: center;'><div style='font-size: 2.8em; font-weight: 900; color: #2563EB;'>☔ {rain}mm</div><div style='color: #475569;'>강수량</div></div>", unsafe_allow_html=True)
 
 weather_msg = "✅ 기상 악화 요인 없음" if temp < 33.0 and temp > -5.0 and rain == 0 else "⚠️ 기상 주의 (폭염/강우/한파 확인)"
@@ -218,7 +214,6 @@ with st.form("tbm_form"):
 
 if submitted and contractor_name:
     rules_text = "\n".join([f"  {idx}. {rule}" for idx, rule in enumerate(get_kosha_safety_rules(selected_industry), 1)])
-    # [수정됨] 생성되는 TBM에도 최대 5개의 뉴스가 포함되도록 수정
     issue_text = "\n".join([f"  • {news['title'].replace('⚡ [네이버 속보] ', '').strip()[:60]}" for news in news_data[:5]])
     
     tbm_result = f"""=========================================
