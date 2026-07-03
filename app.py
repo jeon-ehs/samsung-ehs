@@ -21,7 +21,7 @@ st.set_page_config(
 st_autorefresh(interval=60000, key="ehs_dashboard_refresh")
 
 # =====================================================================
-# 2. 고급 CSS 스타일링
+# 2. 고급 CSS 스타일링 (박스 디자인 제거, 숫자 강조)
 # =====================================================================
 def advanced_css():
     st.markdown("""
@@ -31,11 +31,9 @@ def advanced_css():
             * { font-family: 'Noto Sans KR', sans-serif; }
             html, body, .stApp { background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%); }
             
-            /* 헤더 스타일 */
             header { visibility: hidden; }
             .main .block-container { padding-top: 2rem; padding-bottom: 2rem; padding-left: 2.5rem; padding-right: 2.5rem; }
             
-            /* 카드 스타일 (메인 요소) */
             .metric-card {
                 background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
                 border-radius: 12px;
@@ -46,18 +44,12 @@ def advanced_css():
                 transition: all 0.3s ease-in-out;
                 backdrop-filter: blur(10px);
             }
-            .metric-card:hover {
-                transform: translateY(-5px);
-                box-shadow: 0 8px 25px rgba(29, 78, 216, 0.15);
-            }
             
-            /* 위험도별 카드 색상 */
             .card-safe { border-left-color: #10B981; background: linear-gradient(135deg, #F0FDF4 0%, #ECFDF5 100%); }
             .card-warning { border-left-color: #F59E0B; background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); }
             .card-danger { border-left-color: #EF4444; background: linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%); }
             .card-critical { border-left-color: #DC2626; background: linear-gradient(135deg, #7F1D1D 0%, #991B1B 100%); color: white; }
             
-            /* 뉴스/이슈 박스 */
             .news-box {
                 background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
                 border-left: 5px solid #EAB308;
@@ -73,120 +65,54 @@ def advanced_css():
                 box-shadow: 0 6px 20px rgba(234, 179, 8, 0.2);
                 background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
             }
-            .news-title {
-                font-size: 15px;
-                font-weight: 600;
-                color: #1F2937;
-                line-height: 1.6;
-                margin: 0;
-            }
-            .news-time {
-                font-size: 12px;
-                color: #9CA3AF;
-                margin-top: 8px;
-            }
+            .news-title { font-size: 15px; font-weight: 600; color: #1F2937; line-height: 1.6; margin: 0; }
+            .news-time { font-size: 12px; color: #9CA3AF; margin-top: 8px; }
             
-            /* 탭 스타일 */
             div[data-baseweb="tab-highlight"] { display: none; }
             [data-testid="stTabs"] button {
-                background-color: #f3f4f6 !important;
-                border-radius: 10px !important;
-                padding: 12px 18px !important;
-                border: 2px solid #e5e7eb !important;
-                margin-right: 8px !important;
-                transition: all 0.3s ease-in-out !important;
-                font-weight: 500 !important;
+                background-color: #f3f4f6 !important; border-radius: 10px !important; padding: 12px 18px !important;
+                border: 2px solid #e5e7eb !important; margin-right: 8px !important; transition: all 0.3s ease-in-out !important;
             }
-            [data-testid="stTabs"] button p {
-                color: #6B7280 !important;
-                font-weight: 600 !important;
-                font-size: 14px !important;
-            }
-            
-            /* 탭 활성화 상태 - 색상 테마별 */
+            [data-testid="stTabs"] button p { color: #6B7280 !important; font-weight: 600 !important; font-size: 14px !important; }
             [data-testid="stTabs"] button:nth-of-type(1)[aria-selected="true"] { background-color: #EFF6FF !important; border-color: #1D4ED8 !important; }
             [data-testid="stTabs"] button:nth-of-type(1)[aria-selected="true"] p { color: #1D4ED8 !important; font-weight: 800 !important; }
             [data-testid="stTabs"] button:nth-of-type(2)[aria-selected="true"] { background-color: #F0FDFA !important; border-color: #0F766E !important; }
             [data-testid="stTabs"] button:nth-of-type(2)[aria-selected="true"] p { color: #0F766E !important; font-weight: 800 !important; }
-            [data-testid="stTabs"] button:nth-of-type(3)[aria-selected="true"] { background-color: #FFF7ED !important; border-color: #C2410C !important; }
-            [data-testid="stTabs"] button:nth-of-type(3)[aria-selected="true"] p { color: #C2410C !important; font-weight: 800 !important; }
-            [data-testid="stTabs"] button:nth-of-type(4)[aria-selected="true"] { background-color: #FEF2F2 !important; border-color: #B91C1C !important; }
-            [data-testid="stTabs"] button:nth-of-type(4)[aria-selected="true"] p { color: #B91C1C !important; font-weight: 800 !important; }
-            [data-testid="stTabs"] button:nth-of-type(5)[aria-selected="true"] { background-color: #FAF5FF !important; border-color: #6D28D9 !important; }
-            [data-testid="stTabs"] button:nth-of-type(5)[aria-selected="true"] p { color: #6D28D9 !important; font-weight: 800 !important; }
-            [data-testid="stTabs"] button:nth-of-type(6)[aria-selected="true"] { background-color: #FEF3C7 !important; border-color: #B45309 !important; }
-            [data-testid="stTabs"] button:nth-of-type(6)[aria-selected="true"] p { color: #B45309 !important; font-weight: 800 !important; }
-            [data-testid="stTabs"] button:nth-of-type(7)[aria-selected="true"] { background-color: #F8FAFC !important; border-color: #334155 !important; }
-            [data-testid="stTabs"] button:nth-of-type(7)[aria-selected="true"] p { color: #334155 !important; font-weight: 800 !important; }
             
-            /* 입력 필드 스타일 */
             div[data-baseweb="input"], div[data-baseweb="select"] > div {
-                background-color: #f9fafb !important;
-                border: 2px solid #e5e7eb !important;
-                border-radius: 10px !important;
-                color: #1F2937 !important;
-                font-weight: 500 !important;
-                padding: 10px 14px !important;
-            }
-            div[data-baseweb="input"]:focus-within, div[data-baseweb="select"] > div:focus-within {
-                border-color: #1D4ED8 !important;
-                box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1) !important;
+                background-color: #f9fafb !important; border: 2px solid #e5e7eb !important; border-radius: 10px !important;
+                color: #1F2937 !important; font-weight: 500 !important; padding: 10px 14px !important;
             }
             
-            /* 제목 스타일 */
             h2 {
                 background: linear-gradient(135deg, #1D4ED8 0%, #0F766E 100%);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                background-clip: text;
-                font-weight: 900 !important;
-                letter-spacing: -0.5px;
+                -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+                font-weight: 900 !important; letter-spacing: -0.5px;
             }
-            
-            h3 {
-                color: #1F2937 !important;
-                font-weight: 700 !important;
-                border-bottom: 3px solid #1D4ED8;
-                padding-bottom: 12px;
-            }
-            
-            /* 버튼 스타일 */
-            button {
-                border-radius: 10px !important;
-                font-weight: 600 !important;
-                padding: 12px 24px !important;
-                transition: all 0.3s ease !important;
-                border: none !important;
-            }
-            
-            /* divider 스타일 */
+            h3 { color: #1F2937 !important; font-weight: 700 !important; border-bottom: 3px solid #1D4ED8; padding-bottom: 12px; }
+            button { border-radius: 10px !important; font-weight: 600 !important; padding: 12px 24px !important; border: none !important; }
             hr { border-color: #e5e7eb !important; }
-            
-            /* 캡션 스타일 */
             .stCaption { color: #6B7280 !important; font-size: 13px !important; }
             
-            /* 반응형 레이아웃 */
-            @media (max-width: 768px) {
-                .main .block-container { padding-left: 1rem; padding-right: 1rem; }
-                .news-title { font-size: 14px; }
-            }
         </style>
     """, unsafe_allow_html=True)
 
 advanced_css()
 
 # =====================================================================
-# 3. API 데이터 호출 (이슈 검색을 네이버로 자동 연결)
+# 3. API 데이터 호출
 # =====================================================================
 # 기상 정보: 1분 캐시
 @st.cache_data(ttl=60)
 def get_weather_data():
+    kst = timezone(timedelta(hours=9))
+    now = datetime.datetime.now(kst)
+    fetch_time = now.strftime('%Y-%m-%d %H:%M:%S')
+    
     try:
         if "KMA_API_KEY" in st.secrets:
             api_key = st.secrets["KMA_API_KEY"]
             url = 'http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtNcst'
-            kst = timezone(timedelta(hours=9))
-            now = datetime.datetime.now(kst)
             
             if now.minute < 40:
                 now = now - timedelta(hours=1)
@@ -200,28 +126,28 @@ def get_weather_data():
             response = requests.get(url, params=params, timeout=5)
             if response.status_code == 200:
                 items = response.json()['response']['body']['items']['item']
-                weather = {}
+                weather = {'fetch_time': fetch_time}
                 for item in items:
                     cat = item['category']
                     if cat == 'T1H': weather['temp'] = float(item['obsrValue'])
                     elif cat == 'RN1': weather['rain'] = float(item['obsrValue'])
                     elif cat == 'REH': weather['humid'] = float(item['obsrValue'])
-                if weather:
+                if 'temp' in weather:
                     return weather
-    except Exception as e:
+    except Exception:
         pass
     
-    return {'temp': 28.5, 'humid': 60.0, 'rain': 0.0}
+    return {'temp': 28.5, 'humid': 60.0, 'rain': 0.0, 'fetch_time': fetch_time}
 
-# 뉴스/이슈: 5분 캐시 (네이버 뉴스 및 공단 데이터를 네이버 검색으로 연결)
+# 뉴스/이슈: 5분 캐시
 @st.cache_data(ttl=300)
 def get_daily_news():
     news_list = []
     kst = timezone(timedelta(hours=9))
     current_time = datetime.datetime.now(kst)
-    timestamp = current_time.strftime('%Y-%m-%d %H:%M')
+    timestamp = current_time.strftime('%Y-%m-%d %H:%M:%S')
     
-    # 1. 네이버 뉴스 API 우선 처리 (중대재해 등 실시간 이슈)
+    # 1. 네이버 뉴스 API
     try:
         if "NAVER_CLIENT_ID" in st.secrets and "NAVER_CLIENT_SECRET" in st.secrets:
             headers = {
@@ -247,7 +173,7 @@ def get_daily_news():
     except Exception:
         pass
 
-    # 2. 안전보건공단 API (클릭 시 네이버 검색으로 연동)
+    # 2. 안전보건공단 API (네이버 검색 연결)
     try:
         if "KOSHA_API_KEY" in st.secrets:
             api_key = st.secrets["KOSHA_API_KEY"]
@@ -296,22 +222,6 @@ def get_daily_news():
 # 업종별 안전수칙
 @st.cache_data(ttl=43200)
 def get_kosha_safety_rules(industry):
-    try:
-        if "KOSHA_API_KEY" in st.secrets:
-            api_key = st.secrets["KOSHA_API_KEY"]
-            url = 'http://openapi.kosha.or.kr/openapi/service/rest/SafeHealthInfoService/getIndustrySafeGuide'
-            params = {'serviceKey': api_key, 'searchKeyword': industry, 'type': 'json', 'numOfRows': '3'}
-            response = requests.get(url, params=params, timeout=5)
-            if response.status_code == 200:
-                data = response.json()
-                if 'response' in data and data['response'].get('body'):
-                    items = data['response']['body']['items'].get('item', [])
-                    if not isinstance(items, list): items = [items]
-                    rules = [item.get('subject', '') for item in items if item.get('subject')]
-                    if rules: return rules
-    except Exception:
-        pass
-    
     fallback_db = {
         "시설관리": ["안전모, 안전대 등 개인보호구 착용 철저", "고소작업 시 추락방지망 및 안전난간 확인", "정비 작업 전 전원 차단(LOTO) 실행"],
         "청소": ["물기, 기름기 등에 의한 전도(넘어짐) 사고 주의", "화학세제 사용 시 물질안전보건자료(MSDS) 확인", "작업구간 미끄럼 주의 표지판 설치"],
@@ -339,16 +249,29 @@ with col2:
         f"""
         <div style='text-align: center; background: linear-gradient(135deg, #EFF6FF 0%, #F0FDFA 100%); 
                     border: 2px solid #1D4ED8; border-radius: 10px; padding: 12px; margin-bottom: 20px;'>
-            <p style='margin: 0; color: #1D4ED8; font-weight: 700;'>🔄 <strong>실시간 동기화</strong> | {current_kst_time} (KST)</p>
+            <p style='margin: 0; color: #1D4ED8; font-weight: 700;'>🔄 <strong>화면 자동 갱신 중</strong> | {current_kst_time} (KST)</p>
         </div>
         """, unsafe_allow_html=True
     )
 st.divider()
 
-# --- 기상 정보 섹션 (수치 박스 제거 후 경보 메시지만 유지) ---
-st.subheader("📡 현장 실시간 기상 알림 (수원 기준)")
+# --- 기상 정보 섹션 (박스 제거, 숫자 크기 극대화) ---
 weather_data = get_weather_data()
+weather_fetch_time = weather_data.get('fetch_time', current_kst_time)
+
+st.subheader("📡 현장 실시간 기상 정보 (수원 기준)")
+st.caption(f"🕒 **실시간 기상 업데이트:** {weather_fetch_time} (1분 주기 갱신)")
+
 temp, humid, rain = weather_data['temp'], weather_data['humid'], weather_data['rain']
+
+# 박스 없이 텍스트만 큼직하게 배치
+weather_col1, weather_col2, weather_col3 = st.columns(3)
+with weather_col1:
+    st.markdown(f"<div style='text-align: center; margin-bottom: 15px;'><div style='font-size: 2.8em; font-weight: 900; color: #1D4ED8; line-height: 1.2;'>🌡️ {temp}℃</div><div style='font-size: 1.1em; color: #475569; font-weight: 600;'>현재 기온</div></div>", unsafe_allow_html=True)
+with weather_col2:
+    st.markdown(f"<div style='text-align: center; margin-bottom: 15px;'><div style='font-size: 2.8em; font-weight: 900; color: #1D4ED8; line-height: 1.2;'>💧 {humid}%</div><div style='font-size: 1.1em; color: #475569; font-weight: 600;'>현재 습도</div></div>", unsafe_allow_html=True)
+with weather_col3:
+    st.markdown(f"<div style='text-align: center; margin-bottom: 15px;'><div style='font-size: 2.8em; font-weight: 900; color: #1D4ED8; line-height: 1.2;'>☔ {rain}mm</div><div style='font-size: 1.1em; color: #475569; font-weight: 600;'>강수량</div></div>", unsafe_allow_html=True)
 
 if temp >= 33.0:
     weather_status, weather_level, weather_message, status_color = "🔴 폭염 경보", "critical", "온열질환 발생 위험! 옥외작업 최소화 및 휴식 보장", "#DC2626"
@@ -361,17 +284,19 @@ else:
 
 st.markdown(
     f"""<div class='metric-card card-{weather_level}'>
-        <p style='font-size: 16px; font-weight: 700; margin: 0 0 8px 0; color: {status_color};'>
-            {weather_status} (🌡️ 현재 기온: {temp}℃ / ☔ 강수량: {rain}mm)
-        </p>
+        <p style='font-size: 16px; font-weight: 700; margin: 0 0 8px 0; color: {status_color};'>{weather_status}</p>
         <p style='font-size: 14px; font-weight: 500; margin: 0; color: #475569;'>{weather_message}</p>
     </div>""", unsafe_allow_html=True
 )
 st.divider()
 
 # --- 안전보건 주요 이슈 섹션 ---
-st.subheader("📰 오늘의 안전보건 주요 이슈")
 news_data = get_daily_news()
+news_fetch_time = news_data[0]['time'] if news_data else current_kst_time
+
+st.subheader("📰 오늘의 안전보건 주요 이슈")
+st.caption(f"🕒 **실시간 이슈 업데이트:** {news_fetch_time} (5분 주기 갱신)")
+
 if news_data:
     for idx, news in enumerate(news_data):
         border_color = "#DC2626" if news.get('priority') == 'critical' else "#F59E0B" if news.get('priority') == 'high' else "#0F766E"
@@ -379,7 +304,7 @@ if news_data:
             f"""<a href="{news['url']}" target="_blank" style="text-decoration: none;">
                 <div class='news-box' style='border-left-color: {border_color}; padding: 18px 20px;'>
                     <p class='news-title'>{news['title']}</p>
-                    <p class='news-time'>📅 {news['time']} | 클릭 시 연관 기사 검색</p>
+                    <p class='news-time'>클릭 시 네이버 검색 결과로 연동됩니다.</p>
                 </div></a>""", unsafe_allow_html=True
         )
 else:
