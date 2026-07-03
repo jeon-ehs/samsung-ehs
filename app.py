@@ -3,14 +3,16 @@ import requests
 import datetime
 import urllib.parse
 import time
+import html
+import re
 from streamlit_autorefresh import st_autorefresh
 from datetime import timezone, timedelta
 
 # =====================================================================
-# 1. 페이지 기본 설정 및 자동 갱신
+# 1. 페이지 기본 설정 및 자동 갱신 (앱 사이트명 변경)
 # =====================================================================
 st.set_page_config(
-    page_title="협력사 일일 안전 포털",
+    page_title="협력사 안전보건 정보제공",
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -79,7 +81,7 @@ def dashboard_css():
             }
             .rule-num { color: #3b82f6; font-weight: 800; margin-right: 10px; }
             
-            /* TBM 폼 구역 (Streamlit 기본 폼 스타일 덮어쓰기) */
+            /* TBM 폼 구역 */
             div[data-testid="stForm"] {
                 background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; 
                 box-shadow: 0 1px 3px 0 rgba(0,0,0,0.05); padding: 20px;
@@ -136,9 +138,13 @@ def get_daily_news():
             
             if res.status_code == 200 and res.json().get('items'):
                 for item in res.json()['items']:
-                    title = item['title'].replace('<b>', '').replace('</b>', '').replace('&quot;', '"')
+                    # [수정] HTML 엔티티(&quot; 등) 디코딩 및 태그(<b> 등) 완벽 제거
+                    raw_title = item['title']
+                    unescaped_title = html.unescape(raw_title) # &quot; -> " 변환
+                    clean_title = re.sub(r'<[^>]+>', '', unescaped_title) # HTML 태그 제거
+                    
                     news_list.append({
-                        "title": f"⚡ [속보] {title[:70]}...",
+                        "title": f"⚡ [속보] {clean_title[:70]}...",
                         "url": item['link'],
                         "time": timestamp
                     })
@@ -148,27 +154,32 @@ def get_daily_news():
         news_list = [{"title": "🚨 [시스템] 실시간 뉴스를 불러오는 중입니다...", "url": "#", "time": timestamp}]
     return news_list
 
-@st.cache_data(ttl=43200)
+# [수정] 일일 단위 업데이트 (ttl=86400, 24시간) 및 max 5개 제한
+@st.cache_data(ttl=86400)
 def get_kosha_safety_rules(industry):
     try:
         if "KOSHA_API_KEY" in st.secrets:
             url = 'http://openapi.kosha.or.kr/openapi/service/rest/SafeHealthInfoService/getIndustrySafeGuide'
-            params = {'serviceKey': st.secrets["KOSHA_API_KEY"], 'searchKeyword': industry, 'type': 'json', 'numOfRows': '4'}
+            # numOfRows를 5로 설정하여 최대 5개 가져오기
+            params = {'serviceKey': st.secrets["KOSHA_API_KEY"], 'searchKeyword': industry, 'type': 'json', 'numOfRows': '5'}
             res = requests.get(url, params=params, timeout=5)
             if res.status_code == 200:
                 items = res.json()['response']['body']['items'].get('item', [])
                 if not isinstance(items, list): items = [items]
                 rules = [item.get('subject', '') for item in items if item.get('subject')]
-                if rules: return rules
+                if rules: return rules[:5] # 최대 5개까지만 반환
     except Exception: pass
     
     fallback_db = {
-        "시설관리": ["안전모, 안전대 등 개인보호구 착용 철저", "고소작업 시 추락방지망 및 안전난간 확인", "정비 작업 전 전원 차단(LOTO) 실행"],
-        "청소": ["물기, 기름기 등에 의한 전도(넘어짐) 사고 주의", "화학세제 사용 시 물질안전보건자료(MSDS) 확인"],
-        "물류": ["지게차 작업 반경 내 보행자 접근 엄금", "중량물 취급 시 요통 등 근골격계 질환 주의"],
-        "제조": ["기계기구 회전부(기어, 롤러 등) 끼임 방지 덮개 설치", "소음/분진 발생 공정 시 귀마개 착용"]
+        "시설관리": ["안전모, 안전대 등 개인보호구 착용 철저", "고소작업 시 추락방지망 및 안전난간 확인", "정비 작업 전 전원 차단(LOTO) 실행", "사다리 작업 시 2인 1조 준수", "밀폐공간 진입 전 산소농도 측정"],
+        "청소": ["물기, 기름기 등에 의한 전도(넘어짐) 사고 주의", "화학세제 사용 시 물질안전보건자료(MSDS) 확인", "안전표지판(미끄럼 주의) 설치 철저"],
+        "물류": ["지게차 작업 반경 내 보행자 접근 엄금", "중량물 취급 시 요통 등 근골격계 질환 주의", "상하차 작업 시 작업지휘자 배치"],
+        "제조": ["기계기구 회전부(기어, 롤러 등) 끼임 방지 덮개 설치", "소음/분진 발생 공정 시 귀마개 착용", "지게차 운행 시 제한속도 준수"],
+        "식당": ["뜨거운 물/기름에 의한 화상 주의 및 방열장갑 착용", "바닥 물기 즉시 제거 및 미끄럼 방지 장화 착용"],
+        "서비스": ["고객 응대 시 감정노동 스트레스 관리 및 휴식", "실내 적정 온도 및 환기 유지"],
+        "폐기물처리": ["파쇄기, 압축기 끼임 방지를 위한 방호덮개 확인", "밀폐공간 진입 전 산소/유해가스 농도 측정"]
     }
-    return fallback_db.get(industry, ["기본 안전보호구를 반드시 착용하세요."])
+    return fallback_db.get(industry, ["기본 안전보호구를 반드시 착용하세요."])[:5]
 
 # =====================================================================
 # 4. 화면 렌더링 (2x2 그리드 배열)
@@ -176,10 +187,10 @@ def get_kosha_safety_rules(industry):
 current_time_str = datetime.datetime.now(kst).strftime('%Y-%m-%d %H:%M')
 industry_list = ["시설관리", "청소", "물류", "제조", "식당", "서비스", "폐기물처리"]
 
-# 상단 대시보드 타이틀
+# 상단 대시보드 타이틀 (이름 변경 반영)
 st.markdown(f"""
     <div class="dashboard-header">
-        <h2 class="dashboard-title">협력사 현장안전 DASHBOARD</h2>
+        <h2 class="dashboard-title">협력사 안전보건 정보제공 DASHBOARD</h2>
         <span class="dashboard-time">🔄 동기화 기준: {current_time_str}</span>
     </div>
 """, unsafe_allow_html=True)
@@ -205,7 +216,6 @@ with row1_col1:
     """, unsafe_allow_html=True)
 
 with row1_col2:
-    # 스트림릿 Selectbox를 헤더 바로 아래에 배치
     st.markdown('<div style="font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">업종별 핵심 안전수칙 <span style="font-size: 12px; color: #94a3b8; font-weight: 400; margin-left: 8px;">Safety Rules</span></div>', unsafe_allow_html=True)
     selected_ind_view = st.selectbox("업종 선택", industry_list, label_visibility="collapsed")
     
