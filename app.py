@@ -6,6 +6,7 @@ import time
 import html
 import re
 import math
+from email.utils import parsedate_to_datetime
 from streamlit_autorefresh import st_autorefresh
 from datetime import timezone, timedelta
 
@@ -59,7 +60,7 @@ def dashboard_css():
             .w-label { font-size: 13px; color: #64748b; margin-bottom: 6px; font-weight: 500; }
             .w-val { font-size: 26px; font-weight: 800; }
             .c-temp { color: #dc2626; }  /* 현재기온: 빨강 */
-            .c-feel { color: #ca8a04; }  /* 체감온도: 노랑(가독성을 위해 짙은 머스터드 옐로우) */
+            .c-feel { color: #ca8a04; }  /* 체감온도: 노랑 */
             .c-humid { color: #16a34a; } /* 현재습도: 녹색 */
             .c-rain { color: #2563eb; }  /* 강수량: 파랑 */
             .w-status { 
@@ -109,9 +110,9 @@ def clean_html_text(raw_text):
     return text.strip()
 
 @st.cache_data(ttl=60)
-def get_weather_data(current_min_trigger): # 1분 단위 갱신 트리거
+def get_weather_data(current_min_trigger):
     now = datetime.datetime.now(kst)
-    weather = {'temp': 25.0, 'feel': 25.0, 'humid': 50.0, 'rain': 0.0, 'wind': 0.0} # 기본값
+    weather = {'temp': 25.0, 'feel': 25.0, 'humid': 50.0, 'rain': 0.0, 'wind': 0.0}
     try:
         if "KMA_API_KEY" in st.secrets:
             url = 'http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtNcst'
@@ -125,63 +126,94 @@ def get_weather_data(current_min_trigger): # 1분 단위 갱신 트리거
             if res.status_code == 200:
                 items = res.json()['response']['body']['items']['item']
                 
-                # 기온, 습도, 강수량, 풍속 추출
                 for item in items:
                     if item['category'] == 'T1H': weather['temp'] = float(item['obsrValue'])
                     elif item['category'] == 'RN1': weather['rain'] = float(item['obsrValue'])
                     elif item['category'] == 'REH': weather['humid'] = float(item['obsrValue'])
                     elif item['category'] == 'WSD': weather['wind'] = float(item['obsrValue'])
                 
-                # [신규] 체감온도 산출 로직 적용
                 t = weather['temp']
                 h = weather['humid']
                 v = weather['wind']
                 
-                if t >= 20: # 여름철 온열 체감온도 공식
+                if t >= 20: 
                     tw = t * math.atan(0.151977 * (h + 8.313659)**0.5) + math.atan(t + h) - math.atan(h - 1.676331) + 0.00391838 * (h**1.5) * math.atan(0.023101 * h) - 1.506591
                     weather['feel'] = round(tw, 1)
-                elif t <= 10 and v >= 1.3: # 겨울철 풍속 냉각 체감온도 공식
+                elif t <= 10 and v >= 1.3:
                     tw = 13.12 + 0.6215 * t - 11.37 * (v**0.16) + 0.3965 * (v**0.16) * t
                     weather['feel'] = round(tw, 1)
                 else:
                     weather['feel'] = round(t, 1)
-                    
     except Exception: pass
     return weather
 
-# [핵심 수정] 타임스탬프를 300초(5분)로 나눈 몫을 키로 사용하여 5분마다 완벽하게 강제 갱신
-@st.cache_data(ttl=300)
-def get_daily_news(time_block_5min):
+# [근본 해결] st.cache_data 제거 후 session_state를 통한 수동 컨트롤 및 Python 내부 필터링
+def get_daily_news_robust():
+    now = datetime.datetime.now(kst)
+    
+    # 5분(300초) 캐시 타임 체크
+    if 'news_cache' in st.session_state and 'news_last_update' in st.session_state:
+        delta = now - st.session_state['news_last_update']
+        if delta.total_seconds() < 300:
+            return st.session_state['news_cache']
+            
     news_list = []
-    timestamp = datetime.datetime.now(kst).strftime('%Y-%m-%d %H:%M')
     try:
         if "NAVER_CLIENT_ID" in st.secrets and "NAVER_CLIENT_SECRET" in st.secrets:
             headers = {
                 'X-Naver-Client-Id': st.secrets['NAVER_CLIENT_ID'],
                 'X-Naver-Client-Secret': st.secrets['NAVER_CLIENT_SECRET']
             }
-            # 건설업 배제 및 대상 업종 타겟팅 + 최신순 정렬
-            query_str = "안전보건 OR 산업재해 OR 중대재해 (제조 OR 물류 OR 시설관리 OR 식당 OR 미화 OR 서비스) -건설 -건축 -아파트"
-            query = urllib.parse.quote(query_str)
-            
-            # display=5 를 통해 MAX 5개 제한 설정
-            res = requests.get(f"https://openapi.naver.com/v1/search/news.json?query={query}&display=5&sort=date", headers=headers, timeout=5)
+            # 네이버 API 쿼리는 단순화하고 넓게 가져옴 (오류 방지)
+            query = urllib.parse.quote("안전보건 OR 산업재해 OR 중대재해")
+            # 30개를 넉넉히 가져와서 건설업을 파이썬에서 제외
+            res = requests.get(f"https://openapi.naver.com/v1/search/news.json?query={query}&display=30&sort=date", headers=headers, timeout=5)
             
             if res.status_code == 200 and res.json().get('items'):
+                # 차단할 건설업 관련 키워드 리스트
+                exclude_keywords = ["건설", "건축", "아파트", "시공", "철근", "분양", "재건축", "재개발", "현산", "건산연"]
+                
                 for item in res.json()['items']:
-                    clean_title = clean_html_text(item['title'])
+                    title = clean_html_text(item['title'])
+                    desc = clean_html_text(item['description'])
+                    full_text = title + " " + desc
+                    
+                    # 건설 관련 키워드가 하나라도 포함되면 즉시 제외
+                    if any(kw in full_text for kw in exclude_keywords):
+                        continue
+                        
+                    # 기사 실제 발행일 파싱 (예: 실제 언론사 송고 시간)
+                    pub_date_str = item.get('pubDate', '')
+                    formatted_time = now.strftime('%H:%M')
+                    if pub_date_str:
+                        try:
+                            # RFC 2822 형식 안전 파싱
+                            parsed_date = parsedate_to_datetime(pub_date_str)
+                            formatted_time = parsed_date.astimezone(kst).strftime('%m-%d %H:%M')
+                        except: pass
+                            
                     news_list.append({
-                        "title": f"⚡ [속보] {clean_title[:70]}...",
+                        "title": f"⚡ [속보] {title[:60]}...",
                         "url": item['link'],
-                        "time": timestamp # 5분 단위로 갱신된 현재 시간이 찍힙니다
+                        "time": formatted_time
                     })
-    except Exception: pass
-    
+                    
+                    # 정확히 5개만 채우면 루프 종료
+                    if len(news_list) >= 5:
+                        break
+                        
+    except Exception as e:
+        print(f"News Fetch Error: {e}")
+        
     if not news_list:
-        news_list = [{"title": "🚨 [시스템] 관련 업종 실시간 뉴스를 불러오는 중입니다...", "url": "#", "time": timestamp}]
-    return news_list[:5] # 최종적으로 혹시 모를 5개 초과 방지
+        news_list = [{"title": "🚨 [시스템] 현재 타겟 업종에 부합하는 새로운 이슈가 없습니다.", "url": "#", "time": now.strftime('%H:%M')}]
+        
+    # session_state에 강제 저장하여 5분 유지
+    st.session_state['news_cache'] = news_list
+    st.session_state['news_last_update'] = now
+    
+    return news_list
 
-# KOSHA 안전수칙 (일단위 로테이션 적용 완료)
 @st.cache_data(ttl=86400)
 def get_kosha_safety_rules(industry, date_str):
     day_of_year = datetime.datetime.now(kst).timetuple().tm_yday
@@ -232,7 +264,7 @@ left_col, right_col = st.columns(2, gap="large")
 
 # ----------------- 좌측 단 -----------------
 with left_col:
-    # 1. 기상 정보 카드 (체감온도 추가 및 4구역 배색)
+    # 1. 기상 정보 카드
     weather_data = get_weather_data(now_kst.minute)
     temp, feel, humid, rain = weather_data.get('temp',0), weather_data.get('feel',0), weather_data.get('humid',0), weather_data.get('rain',0)
     weather_msg = "✅ 기상 악화 요인 없음 (정상 작업 가능)" if -5.0 < feel < 33.0 and rain == 0 else "⚠️ 기상 주의 (폭염/강우/한파 안전대책 요망)"
@@ -251,13 +283,13 @@ with left_col:
     """
     st.markdown(weather_html, unsafe_allow_html=True)
 
-    # 2. 실시간 주요 이슈 카드 (5분 단위 타임스탬프 기반 캐시 키 갱신)
-    time_block_5min = int(now_kst.timestamp() // 300)
-    news_data = get_daily_news(time_block_5min)
+    # 2. 실시간 주요 이슈 카드 (Session State 기반의 강제 갱신 로직 호출)
+    news_data = get_daily_news_robust()
     
-    news_html = '<div class="dash-card"><div class="card-header">실시간 타겟업종 주요이슈 <span class="card-header-sub">Safety News (5분 주기 MAX 5건)</span></div>'
+    news_html = '<div class="dash-card"><div class="card-header">실시간 타겟업종 주요이슈 <span class="card-header-sub">Safety News (5분 주기 갱신)</span></div>'
     for news in news_data:
-        news_html += f'<div class="news-item"><a href="{news["url"]}" target="_blank" class="news-title">{news["title"]}</a><div class="news-date">{news["time"]} 업데이트</div></div>'
+        # 뉴스 업데이트 시간 부분에 '기사 발행일' 명시
+        news_html += f'<div class="news-item"><a href="{news["url"]}" target="_blank" class="news-title">{news["title"]}</a><div class="news-date">언론사 송고: {news["time"]}</div></div>'
     news_html += '</div>'
     st.markdown(news_html, unsafe_allow_html=True)
 
